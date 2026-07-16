@@ -3,10 +3,28 @@
 import argparse
 import asyncio
 import sys
+from pathlib import Path
 
+import yaml
 from agents import Runner
 
 from shared.registry.agent_registry import get_agent, list_agents
+
+
+def _load_welcome_message(agent_name: str) -> str:
+    """从 agent 的 config.yaml 读取欢迎词，无则返回默认值。"""
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "hotel_agents"
+        / agent_name
+        / "config.yaml"
+    )
+    if config_path.exists():
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        if cfg and "welcome_message" in cfg:
+            return cfg["welcome_message"].strip()
+    return f"Agent {agent_name} interactive mode (type 'exit' to quit)"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,7 +70,8 @@ async def _interactive_loop(agent_name: str) -> None:
     agent = get_agent(agent_name)
     session = InMemorySession()
 
-    print(f"Agent {agent_name} interactive mode (type 'exit' to quit)")
+    welcome = _load_welcome_message(agent_name)
+    print(welcome)
     print("Input:")
 
     while True:
