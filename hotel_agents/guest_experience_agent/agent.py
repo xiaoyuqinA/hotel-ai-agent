@@ -1,28 +1,31 @@
-import asyncio
+"""Guest Experience Agent — factory + auto-registration."""
+
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from agents import Agent, Runner
+from agents import Agent
 
 from shared.llm.factory import create_agent_model
-
-# Load environment variables from .env file
-load_dotenv(Path(__file__).resolve().parent / ".env")
-
-model = create_agent_model()
-
-agent = Agent(
-    name=os.environ["AGENT_NAME"],
-    instructions="You are a hotel guest experience assistant. Help guests with inquiries about rooms, amenities, bookings, and hotel services.",
-    model=model,
-)
+from shared.registry.agent_registry import register_agent
 
 
-async def main() -> None:
-    result = await Runner.run(agent, "酒店今天的价格是多少?")
-    print(result.final_output)
+def create_agent() -> Agent:
+    """Create and return a Guest Experience Agent instance."""
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+
+    model = create_agent_model()
+
+    return Agent(
+        name=os.environ.get("AGENT_NAME", "guest_experience_agent"),
+        instructions=(
+            "You are a hotel guest experience assistant. "
+            "Help guests with inquiries about rooms, amenities, "
+            "bookings, and hotel services."
+        ),
+        model=model,
+    )
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# Auto-register on module import
+register_agent("guest_experience_agent", create_agent)
