@@ -74,7 +74,10 @@ async def _interactive_loop(agent_name: str) -> None:
     print(welcome)
 
     while True:
-        user_input = input("> ").strip()
+        try:
+            user_input = input("> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            break
         if not user_input:
             continue
         if user_input.lower() in ("exit", "quit"):
