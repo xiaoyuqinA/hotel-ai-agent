@@ -10,3 +10,4 @@ __pycache__/
 *.mo
 *.so
 ipynb_checkpoints/
+.claude/
