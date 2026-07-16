@@ -20,6 +20,11 @@ hotel-ai-agents
 │   │   ├── __init__.py
 │   │   └── client.py
 │   │
+│   ├── conversation                # 会话管理
+│   │   ├── __init__.py
+│   │   ├── session.py              # InMemorySession 实现
+│   │   └── manager.py              # 多 session 管理
+│   │
 │   ├── llm                         # LLM 配置、工厂、调用
 │   │   ├── __init__.py
 │   │   ├── config.py
@@ -102,3 +107,17 @@ hotel-ai-agents
 | Marketing Content Agent    | **OpenAI Agents SDK（当前）**           | 文案生成流程简单，不需要规划     |
 | OTA Operations Agent       | OpenAI Agents SDK → Deep Agents（后续） | 初期查数据即可，复杂运营流程再升级  |
 | Revenue Intelligence Agent | **Deep Agents**                     | 天然属于多步骤分析和规划任务     |
+
+
+## 使用方式
+
+```bash
+# 交互模式（多轮对话）
+python -m launcher.main --agent guest_experience_agent --interactive
+
+# 一次性模式
+python -m launcher.main --agent guest_experience_agent --input "hello"
+
+# 列出 agent
+python -m launcher.main --list
+```
