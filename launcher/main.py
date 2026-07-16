@@ -72,7 +72,6 @@ async def _interactive_loop(agent_name: str) -> None:
 
     welcome = _load_welcome_message(agent_name)
     print(welcome)
-    print("Input:")
 
     while True:
         user_input = input("> ").strip()
