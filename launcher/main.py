@@ -31,6 +31,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="list_agents",
         help="List all registered agents and exit.",
     )
+    parser.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Enter interactive chat mode with the agent.",
+    )
     return parser
 
 
@@ -38,6 +44,26 @@ async def _run(agent_name: str, user_input: str) -> None:
     agent = get_agent(agent_name)
     result = await Runner.run(agent, user_input)
     print(result.final_output)
+
+
+async def _interactive_loop(agent_name: str) -> None:
+    from shared.conversation.session import InMemorySession
+
+    agent = get_agent(agent_name)
+    session = InMemorySession()
+
+    print(f"Agent {agent_name} interactive mode (type 'exit' to quit)")
+    print("Input:")
+
+    while True:
+        user_input = input("> ").strip()
+        if not user_input:
+            continue
+        if user_input.lower() in ("exit", "quit"):
+            break
+
+        result = await Runner.run(agent, user_input, session=session)
+        print(result.final_output)
 
 
 def main() -> None:
@@ -58,7 +84,13 @@ def main() -> None:
         return
 
     if not args.agent or not args.input:
+        if args.interactive:
+            parser.error("--agent is required for interactive mode.")
         parser.error("--agent and --input are required (or use --list).")
+
+    if args.interactive:
+        asyncio.run(_interactive_loop(args.agent))
+        return
 
     asyncio.run(_run(args.agent, args.input))
 
