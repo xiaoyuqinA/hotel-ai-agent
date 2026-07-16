@@ -83,14 +83,14 @@ def main() -> None:
             print(f"  - {name}")
         return
 
-    if not args.agent or not args.input:
-        if args.interactive:
-            parser.error("--agent is required for interactive mode.")
-        parser.error("--agent and --input are required (or use --list).")
-
     if args.interactive:
+        if not args.agent:
+            parser.error("--agent is required for interactive mode.")
         asyncio.run(_interactive_loop(args.agent))
         return
+
+    if not args.agent or not args.input:
+        parser.error("--agent and --input are required (or use --list).")
 
     asyncio.run(_run(args.agent, args.input))
 
