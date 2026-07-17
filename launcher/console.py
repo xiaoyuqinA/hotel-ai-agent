@@ -4,7 +4,7 @@ from typing import Optional
 
 from prompt_toolkit import PromptSession
 
-from shared.runtime.runner import run_agent
+from shared.runtime.runner import stream_agent
 
 
 async def console_chat(agent_name: str, welcome: Optional[str] = None) -> None:
@@ -23,10 +23,13 @@ async def console_chat(agent_name: str, welcome: Optional[str] = None) -> None:
             continue
         if user_input.lower() in ("exit", "quit"):
             break
-        output = await run_agent(agent_name, user_input)
-        print(output)
+        print()
+        async for chunk in stream_agent(agent_name, user_input):
+            print(chunk, end="", flush=True)
+        print()
 
 
 async def run_once(agent_name: str, user_input: str) -> None:
-    output = await run_agent(agent_name, user_input)
-    print(output)
+    async for chunk in stream_agent(agent_name, user_input):
+        print(chunk, end="", flush=True)
+    print()
