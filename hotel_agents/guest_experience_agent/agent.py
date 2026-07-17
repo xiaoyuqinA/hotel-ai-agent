@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 
+import yaml
 from dotenv import load_dotenv
 from agents import Agent
 
@@ -10,14 +11,22 @@ from shared.llm.factory import create_agent_model
 from shared.registry.agent_registry import register_agent
 
 
+def load_config() -> dict:
+    """加载本 agent 的 config.yaml。"""
+    config_path = Path(__file__).resolve().parent / "config.yaml"
+    with open(config_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 def create_agent() -> Agent:
     """Create and return a Guest Experience Agent instance."""
     load_dotenv(Path(__file__).resolve().parent / ".env")
 
+    config = load_config()
     model = create_agent_model()
 
     return Agent(
-        name=os.environ.get("AGENT_NAME", "guest_experience_agent"),
+        name=os.environ.get("AGENT_NAME", config.get("name", "guest_experience_agent")),
         instructions=(
             "You are a hotel guest experience assistant. "
             "Help guests with inquiries about rooms, amenities, "
@@ -28,4 +37,8 @@ def create_agent() -> Agent:
 
 
 # Auto-register on module import
-register_agent("guest_experience_agent", create_agent)
+register_agent(
+    "guest_experience_agent",
+    create_agent,
+    metadata={"welcome_message": load_config().get("ui", {}).get("welcome_message", "")},
+)

@@ -9,18 +9,22 @@ from agents import Agent
 Factory = Callable[[], Agent]
 
 _REGISTRY: Dict[str, Factory] = {}
+_METADATA: Dict[str, dict] = {}
 
 
-def register_agent(name: str, factory: Factory) -> None:
+def register_agent(name: str, factory: Factory, metadata: dict | None = None) -> None:
     """Register an agent factory function.
 
     Args:
         name: Unique agent identifier (e.g. "guest_experience_agent").
         factory: Zero-argument callable that returns a new Agent instance.
+        metadata: Optional metadata dict (e.g. welcome_message) exposed to launcher.
     """
     if name in _REGISTRY:
         raise ValueError(f"Agent '{name}' is already registered.")
     _REGISTRY[name] = factory
+    if metadata:
+        _METADATA[name] = metadata
 
 
 def get_agent(name: str) -> Agent:
@@ -48,3 +52,8 @@ def list_agents() -> List[str]:
 def is_registered(name: str) -> bool:
     """Check whether an agent with *name* has been registered."""
     return name in _REGISTRY
+
+
+def get_metadata(name: str) -> dict | None:
+    """Return metadata registered for an agent, or None if unavailable."""
+    return _METADATA.get(name)
