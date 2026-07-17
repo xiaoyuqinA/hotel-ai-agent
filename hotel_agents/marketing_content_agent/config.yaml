@@ -1,0 +1,18 @@
+name: marketing_content_agent
+description: Marketing content agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    ✍️ 营销内容助手已启动
+
+    您好，我是酒店营销内容助手。
+
+    我可以帮助您：
+    - 创作营销推广文案
+    - 撰写社交媒体内容
+    - 制作邮件营销素材
+    - 优化网站内容描述
+
+    请输入您的需求，输入 exit 退出。

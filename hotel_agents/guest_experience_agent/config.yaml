@@ -1,5 +1,7 @@
 name: guest_experience_agent
 description: Guest experience agent for hotel AI system
+prompt:
+  file: prompt.md
 
 ui:
   welcome_message: |

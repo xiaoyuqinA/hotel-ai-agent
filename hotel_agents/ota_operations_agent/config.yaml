@@ -1,0 +1,18 @@
+name: ota_operations_agent
+description: OTA operations agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    📊 OTA 运营助手已启动
+
+    您好，我是酒店 OTA 运营助手。
+
+    我可以帮助您：
+    - 管理 OTA 平台房源
+    - 分析跨渠道价格与库存
+    - 优化评价回复策略
+    - 渠道绩效分析
+
+    请输入您的问题，输入 exit 退出。

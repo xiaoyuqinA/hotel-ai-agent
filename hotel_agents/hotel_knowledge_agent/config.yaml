@@ -1,0 +1,18 @@
+name: hotel_knowledge_agent
+description: Hotel knowledge agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    📚 酒店知识库助手已启动
+
+    您好，我是酒店知识助手。
+
+    我可以帮助您：
+    - 查询酒店政策和流程
+    - 了解设施信息和营业时间
+    - 获取周边信息和推荐
+    - 查询交通和路线信息
+
+    请输入您的问题，输入 exit 退出。

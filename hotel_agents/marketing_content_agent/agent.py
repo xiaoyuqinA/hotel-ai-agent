@@ -1,19 +1,42 @@
-"""Marketing Content Agent — skeleton."""
+"""Marketing Content Agent — factory + auto-registration."""
 
+import os
+from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
 from agents import Agent
 
+from shared.llm.factory import create_agent_model
+from shared.prompts.loader import load_prompt_from_agent_dir
 from shared.registry.agent_registry import register_agent
+
+
+def load_config() -> dict:
+    """加载本 agent 的 config.yaml。"""
+    config_path = Path(__file__).resolve().parent / "config.yaml"
+    with open(config_path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
 def create_agent() -> Agent:
     """Create and return a Marketing Content Agent instance."""
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+
+    config = load_config()
+    model = create_agent_model()
+    instructions = load_prompt_from_agent_dir(Path(__file__).resolve().parent)
+
     return Agent(
-        name="marketing_content_agent",
-        instructions=(
-            "You are a hotel marketing content assistant. "
-            "Help create promotional copy, social media posts, and marketing materials."
-        ),
+        name=os.environ.get("AGENT_NAME", config.get("name", "marketing_content_agent")) or "marketing_content_agent",
+        instructions=instructions,
+        model=model,
     )
 
 
-register_agent("marketing_content_agent", create_agent)
+# Auto-register on module import
+register_agent(
+    "marketing_content_agent",
+    create_agent,
+    metadata={"welcome_message": load_config().get("ui", {}).get("welcome_message", "")},
+)

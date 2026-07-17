@@ -1,0 +1,18 @@
+name: revenue_intelligence_agent
+description: Revenue intelligence agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    💰 收益智能助手已启动
+
+    您好，我是酒店收益智能助手。
+
+    我可以帮助您：
+    - 收益分析与报告
+    - 动态定价策略建议
+    - 需求预测与趋势分析
+    - 竞对市场对比
+
+    请输入您的问题，输入 exit 退出。

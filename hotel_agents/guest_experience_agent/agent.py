@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from agents import Agent
 
 from shared.llm.factory import create_agent_model
+from shared.prompts.loader import load_prompt_from_agent_dir
 from shared.registry.agent_registry import register_agent
 
 
@@ -25,13 +26,11 @@ def create_agent() -> Agent:
     config = load_config()
     model = create_agent_model()
 
+    instructions = load_prompt_from_agent_dir(Path(__file__).resolve().parent)
+
     return Agent(
-        name=os.environ.get("AGENT_NAME", config.get("name", "guest_experience_agent")),
-        instructions=(
-            "You are a hotel guest experience assistant. "
-            "Help guests with inquiries about rooms, amenities, "
-            "bookings, and hotel services."
-        ),
+        name=os.environ.get("AGENT_NAME", config.get("name", "guest_experience_agent")) or "guest_experience_agent",
+        instructions=instructions,
         model=model,
     )
 
