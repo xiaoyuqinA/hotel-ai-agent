@@ -13,7 +13,7 @@ class OpenAIAdapter:
         result = await Runner.run(agent, user_input, session=session)
         return result.final_output
 
-    def stream(
+    async def stream(
         self, agent: object, user_input: str, session: object | None = None,
     ) -> AsyncGenerator[str, None]:
         result = Runner.run_streamed(agent, input=user_input, session=session)

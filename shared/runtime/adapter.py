@@ -10,7 +10,7 @@ class RuntimeAdapter(Protocol):
         """Run an agent and return final output."""
         ...
 
-    def stream(
+    async def stream(
         self, agent: object, user_input: str, session: object | None = None,
     ) -> AsyncGenerator[str, None]:
         """Run an agent and yield text deltas as they arrive."""
