@@ -1,23 +1,23 @@
-"""Conversation 管理器 — 多 session 的创建、获取、清除"""
-
-from __future__ import annotations
-
-import asyncio
-from typing import Dict
+"""Conversation manager — session lifecycle managed by a SessionStore."""
 
 from shared.conversation.session import InMemorySession
+from shared.conversation.store import MemorySessionStore, SessionStore
 
 
 class ConversationManager:
-    def __init__(self) -> None:
-        self._sessions: Dict[str, InMemorySession] = {}
+    """Manages conversation sessions backed by a SessionStore.
+
+    Callers pass a session_id; the manager handles get-or-create lifecycle.
+    """
+
+    def __init__(self, store: SessionStore | None = None) -> None:
+        self._store = store or MemorySessionStore()
 
     def get_or_create(self, session_id: str) -> InMemorySession:
-        if session_id not in self._sessions:
-            self._sessions[session_id] = InMemorySession()
-        return self._sessions[session_id]
+        session = self._store.get(session_id)
+        if session is None:
+            session = self._store.create(session_id)
+        return session
 
     def clear(self, session_id: str) -> None:
-        session = self._sessions.pop(session_id, None)
-        if session:
-            asyncio.get_event_loop().run_until_complete(session.clear_session())
+        self._store.delete(session_id)

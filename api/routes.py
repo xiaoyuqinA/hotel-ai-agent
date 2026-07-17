@@ -1,12 +1,10 @@
 """API routes for interacting with hotel agents."""
 
-import asyncio
-
 from fastapi import APIRouter, HTTPException
-from agents import Runner
 
-from shared.registry.agent_registry import get_agent, list_agents, is_registered
 from api.schemas import ChatRequest, ChatResponse
+from shared.registry.agent_registry import list_agents, is_registered
+from shared.runtime.runtime import run_agent
 
 router = APIRouter()
 
@@ -19,6 +17,5 @@ async def chat(agent_name: str, req: ChatRequest) -> ChatResponse:
             detail=f"Agent '{agent_name}' not registered. "
             f"Available: {list_agents()}",
         )
-    agent = get_agent(agent_name)
-    result = await Runner.run(agent, req.input)
-    return ChatResponse(agent_name=agent_name, output=result.final_output)
+    output = await run_agent(agent_name, req.input)
+    return ChatResponse(agent_name=agent_name, output=output)

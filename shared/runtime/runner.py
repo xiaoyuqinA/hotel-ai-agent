@@ -1,37 +1,35 @@
-"""Agent runtime — unified entry point for running agents."""
+"""Agent runtime — legacy compatibility layer.
 
-from typing import AsyncIterator
+This module delegates to shared/runtime/runtime.py.
+New code should import from runtime.py directly.
+"""
 
-from agents import Runner
-from openai.types.responses import ResponseTextDeltaEvent
+from typing import AsyncGenerator
 
 from shared.conversation.session import InMemorySession
-from shared.registry.agent_registry import get_agent
+
+# Import the real implementations from runtime.py
+from shared.runtime.runtime import run_agent as _run_agent
+from shared.runtime.runtime import stream_agent as _stream_agent
+
+# Re-export for backward compatibility
+__all__ = ["run_agent", "stream_agent"]
 
 
 async def run_agent(
     agent_name: str,
     user_input: str,
     session: InMemorySession | None = None,
+    session_id: str | None = None,
 ) -> str:
-    """Run an agent and return final output."""
-    agent = get_agent(agent_name)
-    result = await Runner.run(agent, user_input, session=session)
-    return result.final_output
+    return await _run_agent(agent_name, user_input, session, session_id)
 
 
 async def stream_agent(
     agent_name: str,
     user_input: str,
     session: InMemorySession | None = None,
-) -> AsyncIterator[str]:
-    """Run an agent and yield text deltas as they arrive."""
-    agent = get_agent(agent_name)
-    result = Runner.run_streamed(agent, input=user_input, session=session)
-
-    async for event in result.stream_events():
-        if (
-            event.type == "raw_response_event"
-            and isinstance(event.data, ResponseTextDeltaEvent)
-        ):
-            yield event.data.delta
+    session_id: str | None = None,
+) -> AsyncGenerator[str, None]:
+    async for chunk in _stream_agent(agent_name, user_input, session, session_id):
+        yield chunk
