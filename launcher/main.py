@@ -3,9 +3,8 @@
 import argparse
 import asyncio
 
-from agents import Runner
-
-from shared.registry.agent_registry import get_agent, get_metadata, list_agents
+from launcher.console import console_chat, run_once
+from shared.registry.agent_registry import get_metadata, list_agents
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,39 +38,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-async def _run(agent_name: str, user_input: str) -> None:
-    agent = get_agent(agent_name)
-    result = await Runner.run(agent, user_input)
-    print(result.final_output)
-
-
-async def _interactive_loop(agent_name: str) -> None:
-    from shared.conversation.session import InMemorySession
-
-    agent = get_agent(agent_name)
-    session = InMemorySession()
-
-    metadata = get_metadata(agent_name) or {}
-    welcome = metadata.get(
-        "welcome_message",
-        f"Agent {agent_name} interactive mode (type 'exit' to quit)",
-    )
-    print(welcome)
-
-    while True:
-        try:
-            user_input = input("> ").strip()
-        except (KeyboardInterrupt, EOFError):
-            break
-        if not user_input:
-            continue
-        if user_input.lower() in ("exit", "quit"):
-            break
-
-        result = await Runner.run(agent, user_input, session=session)
-        print(result.final_output)
-
-
 def main() -> None:
     # Trigger auto-registration of all agents
     import hotel_agents  # noqa: F401
@@ -92,13 +58,15 @@ def main() -> None:
     if args.interactive:
         if not args.agent:
             parser.error("--agent is required for interactive mode.")
-        asyncio.run(_interactive_loop(args.agent))
+        metadata = get_metadata(args.agent)
+        welcome = metadata.welcome_message if metadata else None
+        asyncio.run(console_chat(args.agent, welcome=welcome))
         return
 
     if not args.agent or not args.input:
         parser.error("--agent and --input are required (or use --list).")
 
-    asyncio.run(_run(args.agent, args.input))
+    asyncio.run(run_once(args.agent, args.input))
 
 
 if __name__ == "__main__":

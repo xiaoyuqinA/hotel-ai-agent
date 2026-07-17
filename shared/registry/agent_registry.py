@@ -2,28 +2,45 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable, Dict, List
 
 from agents import Agent
 
+
+@dataclass
+class AgentMetadata:
+    """Structured metadata for a registered agent."""
+
+    name: str
+    description: str = ""
+    welcome_message: str = ""
+
+
 Factory = Callable[[], Agent]
 
 _REGISTRY: Dict[str, Factory] = {}
-_METADATA: Dict[str, dict] = {}
+_METADATA: Dict[str, AgentMetadata] = {}
 
 
-def register_agent(name: str, factory: Factory, metadata: dict | None = None) -> None:
+def register_agent(
+    name: str,
+    factory: Factory,
+    metadata: AgentMetadata | dict | None = None,
+) -> None:
     """Register an agent factory function.
 
     Args:
         name: Unique agent identifier (e.g. "guest_experience_agent").
         factory: Zero-argument callable that returns a new Agent instance.
-        metadata: Optional metadata dict (e.g. welcome_message) exposed to launcher.
+        metadata: Optional metadata (AgentMetadata or dict) exposed to launcher.
     """
     if name in _REGISTRY:
         raise ValueError(f"Agent '{name}' is already registered.")
     _REGISTRY[name] = factory
     if metadata:
+        if isinstance(metadata, dict):
+            metadata = AgentMetadata(name=name, **metadata)
         _METADATA[name] = metadata
 
 
@@ -54,6 +71,6 @@ def is_registered(name: str) -> bool:
     return name in _REGISTRY
 
 
-def get_metadata(name: str) -> dict | None:
+def get_metadata(name: str) -> AgentMetadata | None:
     """Return metadata registered for an agent, or None if unavailable."""
     return _METADATA.get(name)
