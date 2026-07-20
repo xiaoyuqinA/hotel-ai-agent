@@ -11,3 +11,4 @@ __pycache__/
 *.so
 ipynb_checkpoints/
 .claude/
+.DS_Store
