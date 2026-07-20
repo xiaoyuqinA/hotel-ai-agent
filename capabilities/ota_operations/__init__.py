@@ -1,0 +1,1 @@
+"""OTA operations capability module."""

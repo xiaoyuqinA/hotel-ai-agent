@@ -18,10 +18,21 @@ dependencies = [
     "prompt-toolkit>=3.0.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+]
+
 [tool.setuptools.packages.find]
 include = [
-    "hotel_agents*",
+    "capabilities*",
     "shared*",
     "api*",
     "launcher*",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "needs_llm: 标记需要 LLM 的测试（需要 --run-llm 参数才会运行）",
 ]

@@ -31,7 +31,7 @@ def register_agent(
     """Register an agent factory function.
 
     Args:
-        name: Unique agent identifier (e.g. "guest_experience_agent").
+        name: Unique agent identifier (e.g. "review_analysis_agent").
         factory: Zero-argument callable that returns a new Agent instance.
         metadata: Optional metadata (AgentMetadata or dict) exposed to launcher.
     """

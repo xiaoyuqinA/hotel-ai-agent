@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     # Trigger auto-registration of all agents
-    import hotel_agents  # noqa: F401
+    import capabilities  # noqa: F401
 
     parser = build_parser()
     args = parser.parse_args()

@@ -41,43 +41,56 @@ hotel-ai-agents
 │       ├── deep_adapter.py
 │       └── launcher.py
 │
-├── hotel_agents                    # 业务 Agent
+├── capabilities                    # 业务 Agent（按能力域组织）
 │   │
-│   ├── guest_experience_agent      # OpenAI Agents SDK
-│   │   ├── __init__.py
-│   │   ├── agent.py                # Agent 定义 + 启动入口
-│   │   ├── definition.py           # Agent 定义
-│   │   ├── tools.py                # Agent 专属 Tool
-│   │   ├── prompt.py               # System Prompt
-│   │   └── config.yaml
+│   ├── guest_experience/agents    # 宾客体验能力域
+│   │   ├── review_analysis_agent  # OTA 评论分析（原 guest_experience_agent）
+│   │   │   ├── __init__.py
+│   │   │   ├── agent.py
+│   │   │   ├── schemas.py
+│   │   │   ├── prompt.md
+│   │   │   ├── tools.py
+│   │   │   └── config.yaml
+│   │   ├── review_decision_agent  # 评论处理决策
+│   │   │   ├── __init__.py
+│   │   │   ├── agent.py
+│   │   │   ├── schemas.py
+│   │   │   ├── prompt.md
+│   │   │   └── config.yaml
+│   │   └── review_reply_agent     # 评论回复生成
+│   │       ├── __init__.py
+│   │       ├── agent.py
+│   │       ├── schemas.py
+│   │       ├── prompt.md
+│   │       └── config.yaml
 │   │
-│   ├── hotel_knowledge_agent       # OpenAI Agents SDK
-│   │   ├── __init__.py
-│   │   ├── definition.py
-│   │   ├── tools.py
-│   │   ├── prompt.py
-│   │   └── config.yaml
+│   ├── knowledge/agents
+│   │   └── hotel_knowledge_agent  # OpenAI Agents SDK
+│   │       ├── __init__.py
+│   │       ├── agent.py
+│   │       ├── prompt.md
+│   │       └── config.yaml
 │   │
-│   ├── revenue_intelligence_agent  # Deep Agents
-│   │   ├── __init__.py
-│   │   ├── definition.py
-│   │   ├── tools.py
-│   │   ├── prompt.py
-│   │   └── config.yaml
+│   ├── marketing/agents
+│   │   └── marketing_content_agent # OpenAI Agents SDK
+│   │       ├── __init__.py
+│   │       ├── agent.py
+│   │       ├── prompt.md
+│   │       └── config.yaml
 │   │
-│   ├── ota_operations_agent        # OpenAI Agents SDK
-│   │   ├── __init__.py
-│   │   ├── definition.py
-│   │   ├── tools.py
-│   │   ├── prompt.py
-│   │   └── config.yaml
+│   ├── ota_operations/agents
+│   │   └── ota_operations_agent   # OpenAI Agents SDK
+│   │       ├── __init__.py
+│   │       ├── agent.py
+│   │       ├── prompt.md
+│   │       └── config.yaml
 │   │
-│   └── marketing_content_agent     # OpenAI Agents SDK
-│       ├── __init__.py
-│       ├── definition.py
-│       ├── tools.py
-│       ├── prompt.py
-│       └── config.yaml
+│   └── revenue/agents
+│       └── revenue_intelligence_agent  # Deep Agents
+│           ├── __init__.py
+│           ├── agent.py
+│           ├── prompt.md
+│           └── config.yaml
 │
 ├── launcher                        # 统一入口
 │   ├── __init__.py
@@ -102,7 +115,7 @@ hotel-ai-agents
 
 | Agent                      | 推荐框架                                | 原因                 |
 | -------------------------- | ----------------------------------- | ------------------ |
-| Guest Experience Agent     | OpenAI Agents SDK                   | 问答 + Tool Calling  |
+| Review Analysis Agent          | OpenAI Agents SDK                   | 问答 + Tool Calling  |
 | Hotel Knowledge Agent      | OpenAI Agents SDK                   | RAG + Tool Calling |
 | Marketing Content Agent    | **OpenAI Agents SDK（当前）**           | 文案生成流程简单，不需要规划     |
 | OTA Operations Agent       | OpenAI Agents SDK → Deep Agents（后续） | 初期查数据即可，复杂运营流程再升级  |
@@ -113,10 +126,10 @@ hotel-ai-agents
 
 ```bash
 # 交互模式（多轮对话）
-python -m launcher.main --agent guest_experience_agent --interactive
+python -m launcher.main --agent review_analysis_agent --interactive
 
 # 一次性模式
-python -m launcher.main --agent guest_experience_agent --input "hello"
+python -m launcher.main --agent review_analysis_agent --input "hello"
 
 # 列出 agent
 python -m launcher.main --list

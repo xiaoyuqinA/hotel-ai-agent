@@ -1,0 +1,14 @@
+name: review_reply_agent
+description: Review reply agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    评论回复助手已启动。
+
+    我可以帮助您：
+    - 根据评论分析结果生成专业回复
+    - 撰写得体、专业的客户回复
+
+    请输入您的请求。

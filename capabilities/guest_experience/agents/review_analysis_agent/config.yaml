@@ -1,0 +1,18 @@
+name: review_analysis_agent
+description: Review analysis agent for hotel AI system
+prompt:
+  file: prompt.md
+
+ui:
+  welcome_message: |
+    🏨 酒店智能助手已启动
+
+    您好，我是您的酒店宾客体验助手。
+
+    我可以帮助您：
+    - 查询酒店信息
+    - 了解客房设施
+    - 咨询预订流程
+    - 解答入住相关问题
+
+    请输入您的问题，输入 exit 退出。
