@@ -10,6 +10,7 @@ from agents import Agent
 from shared.llm.factory import create_agent_model
 from shared.prompts.loader import load_prompt_from_agent_dir
 from shared.registry.agent_registry import register_agent
+from .schemas import ReviewAnalysisResult
 
 
 def load_config() -> dict:
@@ -32,6 +33,7 @@ def create_agent() -> Agent:
         name=os.environ.get("AGENT_NAME", config.get("name", "guest_experience_agent")) or "guest_experience_agent",
         instructions=instructions,
         model=model,
+        output_type=ReviewAnalysisResult,
     )
 
 
