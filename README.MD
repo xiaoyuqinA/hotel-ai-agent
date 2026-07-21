@@ -51,18 +51,19 @@ hotel-ai-agents
 │   │   │   ├── prompt.md
 │   │   │   ├── tools.py
 │   │   │   └── config.yaml
-│   │   ├── review_decision_agent  # 评论处理决策
-│   │   │   ├── __init__.py
-│   │   │   ├── agent.py
-│   │   │   ├── schemas.py
-│   │   │   ├── prompt.md
-│   │   │   └── config.yaml
 │   │   └── review_reply_agent     # 评论回复生成
 │   │       ├── __init__.py
 │   │       ├── agent.py
 │   │       ├── schemas.py
 │   │       ├── prompt.md
 │   │       └── config.yaml
+│
+│   ├── decision/                   # 决策引擎（基于规则，非 LLM）
+│   │   ├── __init__.py
+│   │   └── review_decision_engine.py
+│   │
+│   └── workflows/                  # 工作流（预留，后续使用）
+│       └── __init__.py
 │   │
 │   ├── knowledge/agents
 │   │   └── hotel_knowledge_agent  # OpenAI Agents SDK

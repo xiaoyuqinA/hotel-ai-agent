@@ -1,0 +1,74 @@
+[
+  {
+    "id": "case_001",
+    "input": "酒店位置很好，房间也比较干净，但是晚上隔音效果不好，一直听到走廊声音，影响睡眠，希望酒店改善。",
+    "expected": {
+      "severity": "Medium",
+      "sentiment": "negative",
+      "intent": "complaint"
+    }
+  },
+  {
+    "id": "case_002",
+    "input": "酒店环境非常好，房间干净整洁，工作人员服务热情，下次还会选择入住。",
+    "expected": {
+      "severity": "Low",
+      "sentiment": "positive",
+      "intent": "praise"
+    }
+  },
+  {
+    "id": "case_003",
+    "input": "入住当天发现房间卫生很差，床单有明显污渍，联系酒店后没有得到解决，希望退款，并会向平台投诉。",
+    "expected": {
+      "severity": "High",
+      "sentiment": "negative",
+      "intent": "complaint"
+    }
+  },
+  {
+    "id": "case_004",
+    "input": "酒店整体不错，就是早餐种类比较少，希望后续可以增加一些选择。",
+    "expected": {
+      "severity": "Low",
+      "sentiment": "positive",
+      "intent": "suggestion"
+    }
+  },
+  {
+    "id": "case_005",
+    "input": "前台服务态度非常恶劣，对我大声吼叫，我要求正式道歉并投诉。",
+    "expected": {
+      "severity": "Medium",
+      "sentiment": "negative",
+      "intent": "complaint"
+    }
+  },
+  {
+    "id": "case_006",
+    "input": "房间里有虫子，吃了酒店早餐后拉肚子，要求赔偿医疗费。",
+    "expected": {
+      "severity": "High",
+      "sentiment": "negative",
+      "intent": "complaint"
+    }
+  },
+  {
+    "id": "case_007",
+    "input": "请问酒店有没有自助洗衣机？",
+    "expected": {
+      "severity": "Low",
+      "sentiment": "neutral",
+      "intent": "inquiry"
+    }
+  },
+  {
+    "id": "case_008",
+    "input": "房间还不错，但是Wi-Fi很慢，另外前台服务很到位，整体体验一般。",
+    "expected": {
+      "severity": "Medium",
+      "sentiment": "neutral",
+      "intent": "mixed"
+    }
+  }
+]
