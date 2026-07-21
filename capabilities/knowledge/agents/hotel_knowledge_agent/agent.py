@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
 from agents import Agent
 
 from shared.llm.factory import create_agent_model
@@ -21,8 +20,6 @@ def load_config() -> dict:
 
 def create_agent() -> Agent:
     """Create and return a Hotel Knowledge Agent instance."""
-    load_dotenv(Path(__file__).resolve().parent / ".env")
-
     config = load_config()
     model = create_agent_model()
     instructions = load_prompt_from_agent_dir(Path(__file__).resolve().parent)

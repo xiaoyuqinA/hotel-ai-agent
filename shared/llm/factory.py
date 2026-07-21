@@ -1,7 +1,5 @@
 """Model factory for creating agent models from environment configuration."""
 
-import os
-
 from openai import AsyncOpenAI
 
 from agents.models.openai_chatcompletions import (
@@ -10,6 +8,7 @@ from agents.models.openai_chatcompletions import (
 from agents.models.openai_responses import (
     OpenAIResponsesModel,
 )
+from config.settings import LLM_PROVIDER, OPENAI_API_TYPE, OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_API_KEY
 
 
 def create_agent_model():
@@ -19,23 +18,23 @@ def create_agent_model():
     Switching between Chat Completions / Responses API requires only
     changing ``OPENAI_API_TYPE`` in .env, zero code modification.
     """
-    provider = os.getenv("LLM_PROVIDER", "openai")
-    api_type = os.getenv("OPENAI_API_TYPE", "responses")
+    provider = LLM_PROVIDER
+    api_type = OPENAI_API_TYPE
 
     client = AsyncOpenAI(
-        api_key=os.environ["OPENAI_API_KEY"],
-        base_url=os.environ["OPENAI_BASE_URL"],
+        api_key=OPENAI_API_KEY,
+        base_url=OPENAI_BASE_URL,
     )
 
     if provider == "openai":
         if api_type == "chat_completions":
             return OpenAIChatCompletionsModel(
-                model=os.environ["OPENAI_MODEL"],
+                model=OPENAI_MODEL,
                 openai_client=client,
             )
         elif api_type == "responses":
             return OpenAIResponsesModel(
-                model=os.environ["OPENAI_MODEL"],
+                model=OPENAI_MODEL,
                 openai_client=client,
             )
 
