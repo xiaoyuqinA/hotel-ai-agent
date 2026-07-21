@@ -11,6 +11,7 @@ from shared.llm.factory import create_agent_model
 from shared.prompts.loader import load_prompt_from_agent_dir
 from shared.registry.agent_registry import register_agent
 from .schemas import ReplyResult
+from .tools import get_reply_tools
 
 
 def load_config() -> dict:
@@ -32,6 +33,7 @@ def create_agent() -> Agent:
         name=os.environ.get("AGENT_NAME", config.get("name", "review_reply_agent")) or "review_reply_agent",
         instructions=instructions,
         model=model,
+        tools=get_reply_tools(),
         output_type=ReplyResult,
     )
 

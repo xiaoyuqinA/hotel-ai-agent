@@ -1,0 +1,1 @@
+from .client import KnowledgeClient, get_knowledge_client

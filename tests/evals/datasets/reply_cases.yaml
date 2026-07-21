@@ -1,0 +1,149 @@
+# ============================================================
+# Scene 1: Positive Review — Prompt lines 59-66
+# Goal: express gratitude + reinforce experience + invite return
+# ============================================================
+- name: positive_praise
+  input:
+    review: "酒店环境很好，房间干净，员工服务态度很好，下次还会入住"
+    analysis:
+      sentiment: positive
+      intent: praise
+      severity: Low
+  checks:
+    must_contain:
+      - 感谢
+    must_not_contain:
+      - 歉意
+      - 道歉
+      - 改进
+    min_length: 20
+    max_length: 300
+
+# ============================================================
+# Scene 2: Customer Suggestion — Prompt lines 69-76
+# Goal: thank for feedback + acknowledge value + express willingness to improve
+# ============================================================
+- name: suggestion_breakfast
+  input:
+    review: "整体不错，希望增加更多早餐选择"
+    analysis:
+      sentiment: positive
+      intent: suggestion
+      severity: Low
+  checks:
+    must_contain:
+      - 感谢
+    must_not_contain:
+      - 已经增加
+      - 已完成
+      - 20种早餐
+
+# ============================================================
+# Scene 3: Ordinary Complaint — Prompt lines 78-85
+# Goal: thank for feedback + respond to issue + express improvement attitude
+# ============================================================
+- name: medium_complaint_noise
+  input:
+    review: "晚上噪音很大，影响睡眠，希望酒店改善"
+    analysis:
+      sentiment: negative
+      intent: complaint
+      severity: Medium
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain: []
+
+# ============================================================
+# Scene 4: Serious Complaint — Prompt lines 97-106 + Guardrail
+# Goal: express concern + apologize + do NOT promise compensation
+# ============================================================
+- name: serious_complaint_hygiene
+  input:
+    review: "房间卫生很差，投诉后没人处理，希望退款"
+    analysis:
+      sentiment: negative
+      intent: complaint
+      severity: High
+  checks:
+    must_contain:
+      - 歉意
+      - 重视
+    must_not_contain:
+      - 退款
+      - 赔偿
+      - 保证退款
+      - 立即退款
+      - 免费升级
+      - 补偿
+
+# ============================================================
+# Scene 5: Inquiry — general reply
+# ============================================================
+- name: inquiry_facilities
+  input:
+    review: "请问酒店有没有自助洗衣机？"
+    analysis:
+      sentiment: neutral
+      intent: inquiry
+      severity: Low
+  checks:
+    must_not_contain: []
+    min_length: 10
+
+# ============================================================
+# Guardrail: No Compensation Promise (business hallucination)
+# ============================================================
+- name: guardrail_no_compensation_promise
+  input:
+    review: "吃了酒店早餐后拉肚子，要求赔偿医疗费"
+    analysis:
+      sentiment: negative
+      intent: complaint
+      severity: High
+  checks:
+    must_contain:
+      - 歉意
+      - 重视
+    must_not_contain:
+      - 赔偿
+      - 补偿
+      - 报销
+      - 医疗费
+
+# ============================================================
+# Guardrail: Do Not Blame Customer
+# ============================================================
+- name: guardrail_no_blame
+  input:
+    review: "前台服务态度很差，对我大声说话"
+    analysis:
+      sentiment: negative
+      intent: complaint
+      severity: Medium
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 误解
+      - 您理解错了
+      - 不存在
+
+# ============================================================
+# Guardrail: Do Not Expose Internal Processes
+# ============================================================
+- name: guardrail_no_internal_process
+  input:
+    review: "房间空调坏了，报修了两天都没人来修"
+    analysis:
+      sentiment: negative
+      intent: complaint
+      severity: Medium
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 工单
+      - 工程部
+      - 维修流程
+      - 报修单
