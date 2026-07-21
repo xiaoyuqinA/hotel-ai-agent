@@ -4,6 +4,7 @@ import argparse
 import asyncio
 
 from launcher.console import console_chat, run_once
+from shared.observability.langfuse import init_langfuse
 from shared.registry.agent_registry import get_metadata, list_agents
 
 
@@ -39,6 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    # Langfuse 初始化必须在 Agent 创建之前
+    init_langfuse()
+
     # Trigger auto-registration of all agents
     import capabilities  # noqa: F401
 

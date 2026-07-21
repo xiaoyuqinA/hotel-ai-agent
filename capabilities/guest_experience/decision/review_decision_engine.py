@@ -1,13 +1,24 @@
 """评论处理决策引擎 — 基于规则的业务逻辑，非 LLM。"""
 
+from enum import Enum
+
 from pydantic import BaseModel
-from typing import Literal
+
+from capabilities.guest_experience.agents.review_analysis_agent.schemas import ReviewAnalysisResult
+
+
+class ReviewAction(str, Enum):
+    AUTO_REPLY = "auto_reply"
+    AI_REPLY_REVIEW = "ai_reply_review"
+    HUMAN_REVIEW = "human_review"
+
 
 class DecisionResult(BaseModel):
-    action: Literal["auto_reply", "ai_reply_review", "human_review"]
+    action: ReviewAction
     reason: str
 
-def decide_review_action(analysis_result) -> DecisionResult:
+
+def decide_review_action(analysis_result: ReviewAnalysisResult) -> DecisionResult:
     """根据评论分析结果，决定处理方式。
 
     规则：
@@ -19,16 +30,16 @@ def decide_review_action(analysis_result) -> DecisionResult:
 
     if severity == "High":
         return DecisionResult(
-            action="human_review",
+            action=ReviewAction.HUMAN_REVIEW,
             reason=f"问题严重程度为 {severity}，需要人工优先处理",
         )
     elif severity == "Medium":
         return DecisionResult(
-            action="ai_reply_review",
+            action=ReviewAction.AI_REPLY_REVIEW,
             reason=f"问题严重程度为 {severity}，由 AI 生成回复后人工复核",
         )
     else:
         return DecisionResult(
-            action="auto_reply",
+            action=ReviewAction.AUTO_REPLY,
             reason=f"问题严重程度为 {severity}，可自动回复",
         )
