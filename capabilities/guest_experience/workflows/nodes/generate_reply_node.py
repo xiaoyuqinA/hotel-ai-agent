@@ -6,18 +6,17 @@ from shared.runtime.runtime import run_agent
 
 from capabilities.guest_experience.agents.review_reply_agent.schemas import ReplyResult
 
-from ..state import ReviewReplyState
+from ..state import ReviewReplyState, WorkflowError
 
 
 async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
     analysis_result = state.get("anaylay_result")
     if analysis_result is None:
-        return {"reply_content": "感谢您的评论。"}
+        raise WorkflowError("generate_reply failed: analysis result is None")
 
     input_text = json.dumps(analysis_result.model_dump(), ensure_ascii=False)
     result = await run_agent("review_reply_agent", input_text)
 
-    # 提取 str 回复内容
     if isinstance(result, ReplyResult):
         return {"reply_content": result.reply_content}
     if isinstance(result, str):
@@ -27,4 +26,4 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
         except Exception:
             return {"reply_content": result}
 
-    return {"reply_content": "感谢您的评论。"}
+    raise WorkflowError("generate_reply failed: unable to parse result")

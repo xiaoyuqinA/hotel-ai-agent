@@ -7,6 +7,11 @@ from capabilities.guest_experience.agents.review_analysis_agent.schemas import (
 )
 
 
+class WorkflowError(Exception):
+    """工作流节点执行异常。"""
+    pass
+
+
 class ReviewReplyState(TypedDict):
     reviews_content: str
     anaylay_result: ReviewAnalysisResult | None

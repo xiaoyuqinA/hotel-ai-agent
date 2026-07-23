@@ -2,7 +2,7 @@
 
 from langgraph.graph import StateGraph, END
 
-from .state import ReviewReplyState
+from .state import ReviewReplyState, WorkflowError
 from .nodes.analysis_node import analysis_node
 from .nodes.strategy_node import strategy_node, strategy_router
 from .nodes.generate_reply_node import generate_reply_node
@@ -60,6 +60,9 @@ async def run_review_workflow(comment: str) -> ReviewReplyState:
 
     Returns:
         ReviewReplyState: 包含策略、回复内容和发布状态的字典
+
+    Raises:
+        WorkflowError: 节点执行失败时抛出
     """
     initial_state = ReviewReplyState(
         reviews_content=comment,
