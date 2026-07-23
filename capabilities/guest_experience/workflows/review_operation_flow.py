@@ -4,7 +4,7 @@ from langgraph.graph import StateGraph, END
 
 from .state import ReviewReplyState
 from .nodes.analysis_node import analysis_node
-from .nodes.strategy_node import strategy_node, strategy_router, reply_router
+from .nodes.strategy_node import strategy_node, strategy_router
 from .nodes.generate_reply_node import generate_reply_node
 from .nodes.human_review_node import human_review_node
 from .nodes.human_process_node import human_process_node
@@ -32,17 +32,11 @@ def _build_graph() -> StateGraph:
     workflow.add_conditional_edges(
         "strategy",
         strategy_router,
-        {"low": "generate_reply", "medium": "generate_reply", "high": "human_process"},
-    )
-
-    # generate_reply -> reply_router -> publish / human_review
-    workflow.add_conditional_edges(
-        "generate_reply",
-        reply_router,
-        {"low": "publish", "medium": "human_review"},
+        {"low": "generate_reply", "medium": "human_review", "high": "human_process"},
     )
 
     # human_review -> publish
+    workflow.add_edge("generate_reply", "publish")
     workflow.add_edge("human_review", "publish")
     workflow.add_edge("human_process", "publish")
     workflow.add_edge("publish", END)
@@ -51,6 +45,11 @@ def _build_graph() -> StateGraph:
 
 
 graph = _build_graph().compile()
+
+
+def print_graph() -> None:
+    """打印工作流图结构（Mermaid 格式）。"""
+    print(graph.get_graph().draw_mermaid())
 
 
 async def run_review_workflow(comment: str) -> ReviewReplyState:
