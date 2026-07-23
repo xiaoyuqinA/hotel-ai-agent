@@ -63,10 +63,11 @@ async def run_review_workflow(
 
     Low 分支直接返回完整结果。
     Medium 分支在 human_review_node 处暂停，等待 resume_review 恢复。
+    High 分支在 human_process_node 处暂停，等待 resume_process 恢复。
 
     Args:
         comment: 待处理的评论文本
-        thread_id: 会话 ID，用于 Medium 分支人工确认后恢复
+        thread_id: 会话 ID，用于 Medium/High 分支人工处理后恢复
 
     Returns:
         ReviewReplyState: 包含策略、回复内容和发布状态的字典
@@ -83,6 +84,7 @@ async def run_review_workflow(
         anaylay_result=None,
         reply_content=None,
         strategy=None,
+        human_task_type=None,
         publish_status=None,
     )
     result = await graph.ainvoke(initial_state, config=config)
@@ -93,13 +95,35 @@ async def resume_review(
     thread_id: str,
     reply_content: str,
 ) -> ReviewReplyState:
-    """恢复人工确认后的工作流。
+    """恢复人工确认后的工作流（Medium 分支）。
 
     人工可直接通过 AI 原回复，也可修改后通过。
 
     Args:
         thread_id: 工作流会话 ID
         reply_content: 确认后的回复内容（可为 AI 原回复或人工修改后的回复）
+
+    Returns:
+        ReviewReplyState: 包含最终状态的字典
+    """
+    result = await graph.ainvoke(
+        Command(resume={"reply_content": reply_content}),
+        config={"configurable": {"thread_id": thread_id}},
+    )
+    return result
+
+
+async def resume_process(
+    thread_id: str,
+    reply_content: str,
+) -> ReviewReplyState:
+    """恢复人工处理后的工作流（High 分支）。
+
+    人工完全接管，重新判断问题、协调部门后填写最终回复。
+
+    Args:
+        thread_id: 工作流会话 ID
+        reply_content: 人工处理后的最终回复内容
 
     Returns:
         ReviewReplyState: 包含最终状态的字典
