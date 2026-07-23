@@ -85,8 +85,19 @@ def main() -> None:
     if args.workflow:
         if not args.input:
             parser.error("--input is required when using --workflow.")
+        from shared.runtime.workflow_runtime import WorkflowRuntime
         from launcher.workflow import run_workflow_cli
-        asyncio.run(run_workflow_cli(args.workflow, args.input))
+
+        runtime = WorkflowRuntime()
+
+        async def _run_workflow_lifecycle():
+            await runtime.startup()
+            try:
+                await run_workflow_cli(runtime, args.workflow, args.input)
+            finally:
+                await runtime.shutdown()
+
+        asyncio.run(_run_workflow_lifecycle())
         return
 
     if args.interactive:

@@ -2,8 +2,6 @@
 
 from langgraph.graph import StateGraph, END
 
-from shared.workflow.checkpoint import checkpointer
-
 from .state import ReviewReplyState
 from .nodes.analysis_node import analysis_node
 from .nodes.strategy_node import strategy_node, strategy_router, reply_router
@@ -52,9 +50,14 @@ def _build_graph() -> StateGraph:
     return workflow
 
 
-graph = _build_graph().compile(checkpointer=checkpointer)
+def build_compiled_graph(checkpointer):
+    """返回编译后的 graph。由 WorkflowRuntime 在 startup 时调用。"""
+    return _build_graph().compile(checkpointer=checkpointer)
 
 
 def print_graph() -> None:
     """打印工作流图结构（Mermaid 格式）。"""
-    print(graph.get_graph().draw_mermaid())
+    from shared.registry.workflow_registry import get_workflow
+
+    workflow = get_workflow("review_operation")
+    print(workflow.graph.get_graph().draw_mermaid())

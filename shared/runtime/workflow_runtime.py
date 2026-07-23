@@ -9,17 +9,44 @@ from typing import Any
 
 from langgraph.types import Command
 
-from shared.registry.workflow_registry import get_workflow
+from shared.registry.workflow_registry import compile_all, get_workflow
 
 
 class WorkflowRuntime:
     """统一工作流执行入口。
 
     职责：
+    - 管理 AsyncSqliteSaver checkpointer 生命周期
+    - 通过 startup() 激活 checkpointer + 编译 workflow
+    - 通过 shutdown() 释放 checkpointer 连接
     - 通过名称获取编译后的 graph
     - invoke（启动工作流）
     - resume（恢复人工任务）
     """
+
+    def __init__(self):
+        from shared.workflow.checkpoint import DB_PATH
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+        self._checkpointer_ctx = AsyncSqliteSaver.from_conn_string(str(DB_PATH))
+        self._checkpointer = None
+        self._started = False
+
+    async def startup(self) -> None:
+        """启动 runtime：激活 checkpointer + 加载 workflow。"""
+        self._checkpointer = await self._checkpointer_ctx.__aenter__()
+        # Trigger workflow 注册（导入 capabilities 触发 registry 注册）
+        import capabilities  # noqa: F401
+        # 编译所有延迟注册的 workflow
+        compile_all(self._checkpointer)
+        self._started = True
+
+    async def shutdown(self) -> None:
+        """关闭 runtime：释放 checkpointer 连接。"""
+        if self._checkpointer_ctx:
+            await self._checkpointer_ctx.__aexit__(None, None, None)
+        self._checkpointer = None
+        self._started = False
 
     async def run(
         self,
