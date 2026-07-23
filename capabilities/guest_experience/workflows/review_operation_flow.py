@@ -91,45 +91,25 @@ async def run_review_workflow(
     return result
 
 
-async def resume_review(
+async def resume_human_task(
     thread_id: str,
+    task_type: str,
     reply_content: str,
 ) -> ReviewReplyState:
-    """恢复人工确认后的工作流（Medium 分支）。
+    """恢复人工任务后的工作流。
 
-    人工可直接通过 AI 原回复，也可修改后通过。
+    统一入口，覆盖 Medium（人工确认）和 High（人工处理）分支。
 
     Args:
         thread_id: 工作流会话 ID
-        reply_content: 确认后的回复内容（可为 AI 原回复或人工修改后的回复）
-
-    Returns:
-        ReviewReplyState: 包含最终状态的字典
-    """
-    result = await graph.ainvoke(
-        Command(resume={"reply_content": reply_content}),
-        config={"configurable": {"thread_id": thread_id}},
-    )
-    return result
-
-
-async def resume_process(
-    thread_id: str,
-    reply_content: str,
-) -> ReviewReplyState:
-    """恢复人工处理后的工作流（High 分支）。
-
-    人工完全接管，重新判断问题、协调部门后填写最终回复。
-
-    Args:
-        thread_id: 工作流会话 ID
+        task_type: 任务类型（"human_review" / "human_process"）
         reply_content: 人工处理后的最终回复内容
 
     Returns:
         ReviewReplyState: 包含最终状态的字典
     """
     result = await graph.ainvoke(
-        Command(resume={"reply_content": reply_content}),
+        Command(resume={"task_type": task_type, "reply_content": reply_content}),
         config={"configurable": {"thread_id": thread_id}},
     )
     return result

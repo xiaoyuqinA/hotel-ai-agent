@@ -10,7 +10,7 @@ async def human_process_node(
 ) -> ReviewReplyState:
     result = interrupt(
         {
-            "type": "human_process",
+            "task_type": "human_process",
             "reviews_content": state.get("reviews_content"),
             "analysis_result": state.get("anaylay_result"),
             "message": "该评论风险较高，请人工处理并填写回复内容",
