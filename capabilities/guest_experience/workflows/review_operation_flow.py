@@ -1,6 +1,9 @@
 """评论运营工作流 — 基于 LangGraph StateGraph 编排。"""
 
+from typing import Any
+
 from langgraph.graph import StateGraph, END
+from langgraph.types import Command
 
 from .state import ReviewReplyState, WorkflowError
 from .nodes.analysis_node import analysis_node
@@ -35,7 +38,7 @@ def _build_graph() -> StateGraph:
         {"low": "generate_reply", "medium": "human_review", "high": "human_process"},
     )
 
-    # human_review -> publish
+    # 各分支汇聚到 publish
     workflow.add_edge("generate_reply", "publish")
     workflow.add_edge("human_review", "publish")
     workflow.add_edge("human_process", "publish")
@@ -52,11 +55,18 @@ def print_graph() -> None:
     print(graph.get_graph().draw_mermaid())
 
 
-async def run_review_workflow(comment: str) -> ReviewReplyState:
+async def run_review_workflow(
+    comment: str,
+    thread_id: str | None = None,
+) -> ReviewReplyState:
     """运行评论运营工作流。
+
+    Low 分支直接返回完整结果。
+    Medium 分支在 human_review_node 处暂停，等待 resume_review 恢复。
 
     Args:
         comment: 待处理的评论文本
+        thread_id: 会话 ID，用于 Medium 分支人工确认后恢复
 
     Returns:
         ReviewReplyState: 包含策略、回复内容和发布状态的字典
@@ -64,6 +74,10 @@ async def run_review_workflow(comment: str) -> ReviewReplyState:
     Raises:
         WorkflowError: 节点执行失败时抛出
     """
+    config: dict[str, Any] = {}
+    if thread_id is not None:
+        config["configurable"] = {"thread_id": thread_id}
+
     initial_state = ReviewReplyState(
         reviews_content=comment,
         anaylay_result=None,
@@ -71,5 +85,27 @@ async def run_review_workflow(comment: str) -> ReviewReplyState:
         strategy=None,
         publish_status=None,
     )
-    result = await graph.ainvoke(initial_state)
+    result = await graph.ainvoke(initial_state, config=config)
+    return result
+
+
+async def resume_review(
+    thread_id: str,
+    reply_content: str,
+) -> ReviewReplyState:
+    """恢复人工确认后的工作流。
+
+    人工可直接通过 AI 原回复，也可修改后通过。
+
+    Args:
+        thread_id: 工作流会话 ID
+        reply_content: 确认后的回复内容（可为 AI 原回复或人工修改后的回复）
+
+    Returns:
+        ReviewReplyState: 包含最终状态的字典
+    """
+    result = await graph.ainvoke(
+        Command(resume={"reply_content": reply_content}),
+        config={"configurable": {"thread_id": thread_id}},
+    )
     return result
