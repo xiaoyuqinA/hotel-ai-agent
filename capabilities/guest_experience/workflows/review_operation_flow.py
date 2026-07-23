@@ -62,5 +62,12 @@ async def run_review_workflow(comment: str) -> ReviewReplyState:
     Returns:
         ReviewReplyState: 包含策略、回复内容和发布状态的字典
     """
-    result = await graph.ainvoke({"reviews_content": comment})
+    initial_state = ReviewReplyState(
+        reviews_content=comment,
+        anaylay_result=None,
+        reply_content=None,
+        strategy=None,
+        publish_status=None,
+    )
+    result = await graph.ainvoke(initial_state)
     return result

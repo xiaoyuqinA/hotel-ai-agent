@@ -2,13 +2,14 @@
 
 from typing import TypedDict
 
-from capabilities.guest_experience.agents.review_analysis_agent.schemas import ReviewAnalysisResult
-from capabilities.guest_experience.agents.review_reply_agent.schemas import ReplyResult
+from capabilities.guest_experience.agents.review_analysis_agent.schemas import (
+    ReviewAnalysisResult,
+)
 
 
-class ReviewReplyState(TypedDict, total=False):
+class ReviewReplyState(TypedDict):
     reviews_content: str
-    anaylay_result: ReviewAnalysisResult
-    reply_content: ReplyResult
-    strategy: str
-    publish_status: str
+    anaylay_result: ReviewAnalysisResult | None
+    reply_content: str | None
+    strategy: str | None
+    publish_status: str | None
