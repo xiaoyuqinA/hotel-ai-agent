@@ -4,9 +4,8 @@ from langgraph.graph import StateGraph, END
 
 from .state import ReviewReplyState
 from .nodes.analysis_node import analysis_node
-from .nodes.strategy_node import strategy_node, strategy_router
-from .nodes.low_reply_node import low_reply_node
-from .nodes.medium_reply_node import medium_reply_node
+from .nodes.strategy_node import strategy_node, strategy_router, reply_router
+from .nodes.generate_reply_node import generate_reply_node
 from .nodes.human_review_node import human_review_node
 from .nodes.human_process_node import human_process_node
 from .nodes.publish_node import publish_node
@@ -18,8 +17,7 @@ def _build_graph() -> StateGraph:
     # 注册节点
     workflow.add_node("analysis", analysis_node)
     workflow.add_node("strategy", strategy_node)
-    workflow.add_node("low_reply", low_reply_node)
-    workflow.add_node("medium_reply", medium_reply_node)
+    workflow.add_node("generate_reply", generate_reply_node)
     workflow.add_node("human_review", human_review_node)
     workflow.add_node("human_process", human_process_node)
     workflow.add_node("publish", publish_node)
@@ -34,12 +32,17 @@ def _build_graph() -> StateGraph:
     workflow.add_conditional_edges(
         "strategy",
         strategy_router,
-        {"low": "low_reply", "medium": "medium_reply", "high": "human_process"},
+        {"low": "generate_reply", "medium": "generate_reply", "high": "human_process"},
     )
 
-    # 各分支汇聚到 publish
-    workflow.add_edge("low_reply", "publish")
-    workflow.add_edge("medium_reply", "human_review")
+    # generate_reply -> reply_router -> publish / human_review
+    workflow.add_conditional_edges(
+        "generate_reply",
+        reply_router,
+        {"low": "publish", "medium": "human_review"},
+    )
+
+    # human_review -> publish
     workflow.add_edge("human_review", "publish")
     workflow.add_edge("human_process", "publish")
     workflow.add_edge("publish", END)
