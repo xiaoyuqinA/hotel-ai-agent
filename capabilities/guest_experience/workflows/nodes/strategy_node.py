@@ -27,3 +27,8 @@ async def strategy_node(state: ReviewReplyState) -> ReviewReplyState:
 def strategy_router(state: ReviewReplyState) -> str:
     """返回策略字符串，作为路由目标。"""
     return state.get("strategy", "high")
+
+
+def reply_router(state: ReviewReplyState) -> str:
+    """生成回复后，根据策略路由：low → publish，medium → human_review。"""
+    return state.get("strategy", "low")

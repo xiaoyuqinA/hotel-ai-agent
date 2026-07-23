@@ -125,6 +125,9 @@ hotel-ai-agents
 
 ## 使用方式
 
+> **注意**：必须使用 `python -m launcher.main` 启动（不能直接 `python launcher/main.py`），
+> 因为项目是 package 化结构，Python 需要将项目根目录加入 `sys.path` 才能解析 `from launcher.xxx` 等导入。
+
 ```bash
 # 交互模式（多轮对话）
 python -m launcher.main --agent review_analysis_agent --interactive
@@ -134,4 +137,10 @@ python -m launcher.main --agent review_analysis_agent --input "hello"
 
 # 列出 agent
 python -m launcher.main --list
+
+# 列出 workflow
+python -m launcher.main --list-workflows
+
+# 运行 workflow
+python -m launcher.main --workflow review_operation --input "房间卫生很差"
 ```

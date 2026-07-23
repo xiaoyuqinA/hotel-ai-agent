@@ -1,4 +1,4 @@
-"""Unified CLI launcher — run any registered agent from the command line."""
+"""Unified CLI launcher — run any registered agent or workflow from the command line."""
 
 import argparse
 import asyncio
@@ -36,6 +36,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enter interactive chat mode with the agent.",
     )
+    parser.add_argument(
+        "--workflow",
+        type=str,
+        default=None,
+        help="Workflow name to run (use --list-workflows to see available workflows).",
+    )
+    parser.add_argument(
+        "--list-workflows",
+        action="store_true",
+        dest="list_workflows",
+        help="List all registered workflows and exit.",
+    )
     return parser
 
 
@@ -59,6 +71,24 @@ def main() -> None:
             print(f"  - {name}")
         return
 
+    if args.list_workflows:
+        from shared.registry.workflow_registry import list_workflows
+        names = list_workflows()
+        if not names:
+            print("No workflows registered.")
+            return
+        print("Registered workflows:")
+        for name in names:
+            print(f"  - {name}")
+        return
+
+    if args.workflow:
+        if not args.input:
+            parser.error("--input is required when using --workflow.")
+        from launcher.workflow import run_workflow_cli
+        asyncio.run(run_workflow_cli(args.workflow, args.input))
+        return
+
     if args.interactive:
         if not args.agent:
             parser.error("--agent is required for interactive mode.")
@@ -68,7 +98,7 @@ def main() -> None:
         return
 
     if not args.agent or not args.input:
-        parser.error("--agent and --input are required (or use --list).")
+        parser.error("--agent and --input are required (or use --workflow, --list, or --list-workflows).")
 
     asyncio.run(run_once(args.agent, args.input))
 
