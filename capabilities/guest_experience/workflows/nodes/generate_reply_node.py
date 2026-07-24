@@ -2,6 +2,8 @@
 
 import json
 
+from pydantic import ValidationError
+
 from shared.runtime.runtime import run_agent
 
 from capabilities.guest_experience.agents.review_reply_agent.schemas import ReplyResult
@@ -14,10 +16,13 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
     if analysis_result is None:
         raise WorkflowError("generate_reply failed: analysis result is None")
 
-    input_text = json.dumps({
-        "original_comment": state["reviews_content"],
-        "analysis": analysis_result.model_dump(),
-    }, ensure_ascii=False)
+    input_text = json.dumps(
+        {
+            "original_comment": state["reviews_content"],
+            "analysis": analysis_result.model_dump(),
+        },
+        ensure_ascii=False,
+    )
     result = await run_agent("review_reply_agent", input_text)
 
     if isinstance(result, ReplyResult):
@@ -26,7 +31,7 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
         try:
             reply = ReplyResult.model_validate_json(result)
             return {"reply_content": reply.reply_content}
-        except Exception:
+        except (json.JSONDecodeError, ValidationError):
             return {"reply_content": result}
 
     raise WorkflowError("generate_reply failed: unable to parse result")
