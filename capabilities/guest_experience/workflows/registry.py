@@ -11,7 +11,8 @@ register_workflow(
     "review_operation",
     factory=build_compiled_graph,
     input_mapper=lambda x: {
-        "reviews_content": x,
+        "reviews_content": x if isinstance(x, str) else x[1],
+        "hotel_id": x[0] if isinstance(x, tuple) else "hotel_001",
         "anaylay_result": None,
         "reply_content": None,
         "strategy": None,

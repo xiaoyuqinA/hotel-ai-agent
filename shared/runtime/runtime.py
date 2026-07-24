@@ -1,6 +1,8 @@
 """Agent runtime — the single execution entry point for all agents."""
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, TypeVar
+
+from pydantic import BaseModel
 
 from shared.conversation.manager import ConversationManager
 from shared.conversation.session import InMemorySession
@@ -8,6 +10,8 @@ from shared.conversation.store import SessionStore
 from shared.registry.agent_registry import get_agent
 from shared.runtime.adapter import RuntimeAdapter
 from shared.runtime.openai_adapter import OpenAIAdapter
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class AgentRuntime:
@@ -94,3 +98,21 @@ async def stream_agent(
     """Run an agent and yield text deltas as they arrive."""
     async for chunk in _runtime().stream(agent_name, user_input, session, session_id):
         yield chunk
+
+
+async def run_agent_typed(
+    agent_name: str,
+    user_input: str,
+    output_type: type[T],
+    session: InMemorySession | None = None,
+    session_id: str | None = None,
+) -> T:
+    """Run an agent and return typed output.
+
+    run_agent() 保持返回 str，向后兼容。
+    run_agent_typed() 用于需要类型安全的调用者（workflow nodes）。
+    """
+    result = await run_agent(agent_name, user_input, session, session_id)
+    if isinstance(result, output_type):
+        return result
+    return output_type.model_validate_json(result)

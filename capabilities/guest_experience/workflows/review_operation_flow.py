@@ -3,6 +3,7 @@
 from langgraph.graph import StateGraph, END
 
 from .state import ReviewReplyState
+from .nodes.load_hotel_context_node import load_hotel_context_node
 from .nodes.analysis_node import analysis_node
 from .nodes.strategy_node import strategy_node, strategy_router, reply_router
 from .nodes.generate_reply_node import generate_reply_node
@@ -15,6 +16,7 @@ def _build_graph() -> StateGraph:
     workflow = StateGraph(ReviewReplyState)
 
     # 注册节点
+    workflow.add_node("load_hotel_context", load_hotel_context_node)
     workflow.add_node("analysis", analysis_node)
     workflow.add_node("strategy", strategy_node)
     workflow.add_node("generate_reply", generate_reply_node)
@@ -23,7 +25,10 @@ def _build_graph() -> StateGraph:
     workflow.add_node("publish", publish_node)
 
     # 入口
-    workflow.set_entry_point("analysis")
+    workflow.set_entry_point("load_hotel_context")
+
+    # load_hotel_context -> analysis
+    workflow.add_edge("load_hotel_context", "analysis")
 
     # analysis -> strategy
     workflow.add_edge("analysis", "strategy")

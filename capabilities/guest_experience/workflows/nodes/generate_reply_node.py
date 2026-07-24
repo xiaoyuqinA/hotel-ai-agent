@@ -1,10 +1,9 @@
 """Generate Reply Node — 调用 review_reply_agent 生成回复。"""
 
-import json
-
-from shared.runtime.runtime import run_agent
+from shared.runtime.runtime import run_agent_typed
 
 from capabilities.guest_experience.agents.review_reply_agent.schemas import ReplyResult
+from capabilities.guest_experience.mappers.reply_input_mapper import ReplyInputMapper
 
 from ..state import ReviewReplyState, WorkflowError
 
@@ -14,19 +13,11 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
     if analysis_result is None:
         raise WorkflowError("generate_reply failed: analysis result is None")
 
-    input_text = json.dumps(
-        {
-            "original_comment": state["reviews_content"],
-            "analysis": analysis_result.model_dump(),
-        },
-        ensure_ascii=False,
-    )
-    result = await run_agent("review_reply_agent", input_text)
+    hotel_context = state.get("hotel_context")
+    if hotel_context is None:
+        raise WorkflowError("generate_reply failed: hotel_context is None")
 
-    if isinstance(result, ReplyResult):
-        return {"reply_content": result.reply_content}
-    if isinstance(result, str):
-        reply = ReplyResult.model_validate_json(result)
-        return {"reply_content": reply.reply_content}
+    input_text = ReplyInputMapper().map(state)
+    result = await run_agent_typed("review_reply_agent", input_text, ReplyResult)
 
-    raise WorkflowError("generate_reply failed: unable to parse result")
+    return {"reply_content": result.reply_content}
