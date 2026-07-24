@@ -20,3 +20,5 @@ class ReviewReplyState(TypedDict):
     # 人工任务类型，用于区分 High 分支不同场景
     human_task_type: str | None
     publish_status: str | None
+    # 工作流会话 ID，用于 interrupt 后恢复
+    thread_id: str | None
