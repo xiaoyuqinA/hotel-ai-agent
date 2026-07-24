@@ -139,8 +139,6 @@
 <Output>
 
 {
-  "original_comment": "酒店位置很好，房间也比较干净，但是晚上隔音效果不好，一直听到走廊声音，影响睡眠，希望酒店改善。",
-
   "issue_severity": {
     "level": "Medium",
     "reason": "客户反馈房间噪音问题，已经影响正常休息，但未涉及安全、卫生等严重问题。"
@@ -174,8 +172,6 @@
 <Output>
 
 {
-  "original_comment": "酒店环境非常好，房间干净整洁，工作人员服务热情，下次还会选择入住。",
-
   "issue_severity": {
     "level": "Low",
     "reason": "客户未反馈明显问题，仅表达对酒店环境、房间和服务的满意评价。"
@@ -209,8 +205,6 @@
 <Output>
 
 {
-  "original_comment": "入住当天发现房间卫生很差，床单有明显污渍，联系酒店后没有得到解决，希望退款，并会向平台投诉。",
-
   "issue_severity": {
     "level": "High",
     "reason": "客户反馈严重卫生问题，并且提出退款要求以及投诉升级风险，需要人工优先处理。"
@@ -244,8 +238,6 @@
 <Output>
 
 {
-  "original_comment": "酒店整体不错，就是早餐种类比较少，希望后续可以增加一些选择。",
-
   "issue_severity": {
     "level": "Low",
     "reason": "客户提出服务优化建议，不影响整体入住体验。"

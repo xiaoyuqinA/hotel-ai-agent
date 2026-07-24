@@ -174,14 +174,20 @@
 
 客户评论：
 
-酒店环境很好，房间干净整洁，工作人员服务态度很好，下次还会选择入住。
+酒店环境很好，房间干净整洞，工作人员服务态度很好，下次还会选择入住。
 
 评论分析：
 
 {
-  "customer_sentiment": "positive",
-  "customer_intent": "praise",
-  "issue_severity": "Low"
+  "issue_severity": {
+    "level": "Low",
+    "reason": "客户未反馈明显问题，仅表达对酒店环境、房间和服务的满意评价。"
+  },
+  "customer_sentiment": {
+    "label": "positive",
+    "confidence": 0.95
+  },
+  "customer_intent": "praise"
 }
 
 </Input>
@@ -210,9 +216,15 @@
 评论分析：
 
 {
-  "customer_sentiment": "negative",
-  "customer_intent": "complaint",
-  "issue_severity": "Medium"
+  "issue_severity": {
+    "level": "Medium",
+    "reason": "客户反馈房间噪音问题，已经影响正常休息，但未涉及安全、卫生等严重问题。"
+  },
+  "customer_sentiment": {
+    "label": "negative",
+    "confidence": 0.9
+  },
+  "customer_intent": "complaint"
 }
 
 </Input>
@@ -241,9 +253,15 @@
 评论分析：
 
 {
-  "customer_sentiment": "negative",
-  "customer_intent": "complaint",
-  "issue_severity": "High"
+  "issue_severity": {
+    "level": "High",
+    "reason": "客户反馈严重卫生问题，并且提出退款要求以及投诉升级风险，需要人工优先处理。"
+  },
+  "customer_sentiment": {
+    "label": "negative",
+    "confidence": 0.98
+  },
+  "customer_intent": "complaint"
 }
 
 </Input>

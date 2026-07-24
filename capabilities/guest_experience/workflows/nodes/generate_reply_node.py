@@ -14,7 +14,10 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
     if analysis_result is None:
         raise WorkflowError("generate_reply failed: analysis result is None")
 
-    input_text = json.dumps(analysis_result.model_dump(), ensure_ascii=False)
+    input_text = json.dumps({
+        "original_comment": state["reviews_content"],
+        "analysis": analysis_result.model_dump(),
+    }, ensure_ascii=False)
     result = await run_agent("review_reply_agent", input_text)
 
     if isinstance(result, ReplyResult):

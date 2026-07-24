@@ -13,7 +13,6 @@ class CustomerSentiment(BaseModel):
 
 
 class ReviewAnalysisResult(BaseModel):
-    original_comment: str
     issue_severity: IssueSeverity
     customer_sentiment: CustomerSentiment
     customer_intent: Literal["praise", "complaint", "suggestion", "inquiry", "request", "mixed"]
