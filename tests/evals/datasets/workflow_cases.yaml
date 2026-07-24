@@ -1,0 +1,271 @@
+# HotelContext Workflow Evaluation — Golden Dataset
+# 20 cases across 5 categories.
+# Only Low severity cases are used for golden dataset tests (full workflow completes).
+# Medium/High cases are tested via interrupt detection in test_context_injection.py.
+
+# ============================================================
+# Category 1: Cleanliness Complaint (5 cases)
+# ============================================================
+- name: cleanliness_bathroom_odor
+  review: "房间卫生很差，浴室有异味"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: cleanliness_bedding
+  review: "床上用具脏兮兮的，床单有黄色斑点"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: cleanliness_kitchen
+  review: "房间里到处尘土，窗台特别脏"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: cleanliness_towel
+  review: "提供的毛巾颜色发黄，看起来没洗干净"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: cleanliness_floor
+  review: "房间地板脏得难看，拖都没拖"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+# ============================================================
+# Category 2: Service Attitude (5 cases)
+# ============================================================
+- name: service_front_desk_rude
+  review: "前台态度差，对我大声说话"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 误解
+      - 您理解错了
+      - 不存在
+    min_length: 30
+    max_length: 500
+
+- name: service_no_response
+  review: "反复叫楼层服务，没人响应"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: service_bellhop_slow
+  review: "叫行李小费了半小时才送到"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: service_restaurant_wait
+  review: "餐厅服务员不太给力，点菜后很久才上来"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: service_receptionist_impolite
+  review: "前台接待时非常没耐心，态度很差"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 误解
+      - 您理解错了
+      - 不存在
+    min_length: 30
+    max_length: 500
+
+# ============================================================
+# Category 3: Breakfast Inquiry (3 cases)
+# ============================================================
+- name: breakfast_time
+  review: "早餐几点开始？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 7:00
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+- name: breakfast_options
+  review: "早餇有什么选择？提供早餐吗？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 7:00
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+- name: breakfast_location
+  review: "早餐在哪里吃？二楼餐厅是吗？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 7:00
+      - 二楼
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+# ============================================================
+# Category 4: Parking Inquiry (3 cases)
+# ============================================================
+- name: parking_free
+  review: "停车场怎么样？免费吗？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 免费
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+- name: parking_location
+  review: "停车场在哪里？怎么找？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 地下
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+- name: parking_available
+  review: "停车位够不够？预定房间后怎么停车？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 免费
+      - 地下
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
+
+# ============================================================
+# Category 5: Facility Issue (4 cases)
+# ============================================================
+- name: facility_ac_broken
+  review: "空调坏了，房间太热"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 工单
+      - 工程部
+      - 维修流程
+      - 报修单
+    min_length: 30
+    max_length: 500
+
+- name: facility_wifi_slow
+  review: "WiFi信号太弱，根本连不上"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: facility_tv_remote
+  review: "电视遥控器坏了，更换了好久"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 歉意
+    must_not_contain:
+      - 退款
+      - 赔偿
+    min_length: 30
+    max_length: 500
+
+- name: facility_pool_closed
+  review: "泳池关了吗？什么时候开放？"
+  hotel_id: hotel_001
+  severity: Low
+  checks:
+    must_contain:
+      - 感谢
+    must_not_contain: []
+    min_length: 20
+    max_length: 500
