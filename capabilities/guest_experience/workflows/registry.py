@@ -10,5 +10,12 @@ from .review_operation_flow import build_compiled_graph
 register_workflow(
     "review_operation",
     factory=build_compiled_graph,
-    input_mapper=lambda x: {"reviews_content": x},
+    input_mapper=lambda x: {
+        "reviews_content": x,
+        "anaylay_result": None,
+        "reply_content": None,
+        "strategy": None,
+        "human_task_type": None,
+        "publish_status": None,
+    },
 )
