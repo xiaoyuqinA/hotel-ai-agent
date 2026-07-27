@@ -271,11 +271,3 @@ async def get_statistics(
             "pending_runs": status_counts.get("pending", 0),
             "period_days": days,
         }
-
-
-async def get_pending_approvals_count() -> int:
-    """获取待审批数量。"""
-    from shared.workflow_events.approval_service import list_pending_approvals
-
-    approvals = await list_pending_approvals()
-    return len(approvals)

@@ -46,28 +46,3 @@ CREATE INDEX idx_workflow_events_created_at ON workflow_events(created_at);
 COMMENT ON TABLE workflow_events IS 'Event Sourcing store for workflow events';
 COMMENT ON COLUMN workflow_events.workflow_id IS 'References workflow_runs.id';
 COMMENT ON COLUMN workflow_events.sequence IS 'Monotonically increasing sequence (like Kafka offset)';
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- workflow_approvals 表：Human Approval（Phase 3）
--- ═══════════════════════════════════════════════════════════════════════════════
-
-CREATE TABLE IF NOT EXISTS workflow_approvals (
-    id VARCHAR(64) PRIMARY KEY,
-    run_id VARCHAR(64) NOT NULL,
-    thread_id VARCHAR(128) NOT NULL,
-    workflow_name VARCHAR(128) NOT NULL,
-    task_type VARCHAR(64) NOT NULL,
-    payload JSONB NOT NULL DEFAULT '{}',
-    status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    resolution JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    resolved_at TIMESTAMP WITH TIME ZONE
-);
-
-CREATE INDEX idx_workflow_approvals_run_id ON workflow_approvals(run_id);
-CREATE INDEX idx_workflow_approvals_status ON workflow_approvals(status);
-CREATE INDEX idx_workflow_approvals_created_at ON workflow_approvals(created_at);
-
-COMMENT ON TABLE workflow_approvals IS 'Human approval records for workflow interrupts';
-COMMENT ON COLUMN workflow_approvals.task_type IS 'interrupt type: human_review / human_process';
-COMMENT ON COLUMN workflow_approvals.status IS 'pending / approved / rejected';
