@@ -23,3 +23,29 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL", "")
+
+# ── PostgreSQL（Phase 2: Workflow Event Store）───────────────────────────────
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "hotel_ai")
+
+
+def get_postgres_url() -> str:
+    """构建 PostgreSQL 连接 URL。"""
+    return (
+        f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
+        f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    )
+
+
+# ── Redis（Phase 2: Real-time Pub/Sub）────────────────────────────────────────
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+
+
+def get_redis_url() -> str:
+    """构建 Redis 连接 URL。"""
+    return f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
