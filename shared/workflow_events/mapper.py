@@ -1,14 +1,16 @@
-"""Typed Projection Mapper — LangGraph v3 Projection → WorkflowEvent 转换器。
+"""ProjectionMapper — LangGraph v3 单事件流 → WorkflowEvent 转换器。
 
-基于 LangGraph 官方 Event Streaming 文档：
-https://docs.langchain.com/oss/python/langgraph/event-streaming
+设计原则：
+1. astream_events(version="v3") 返回单个 async iterator
+2. 通过 transform() 将每个 LangGraph 事件转换为 WorkflowEvent
+3. sequence 使用事件自带的 seq 字段保证顺序
 
-v3 Typed Projections:
-    stream.messages    → LLM 消息/token (AIMessageChunk)
-    stream.values      → 状态快照
-    stream.output      → 最终输出（属性，非方法）
-    stream.subgraphs   → 子图
-    stream.extensions  → 自定义事件（get_stream_writer 写入）
+事件分类：
+- values:   LangGraph State 快照 (category="state")
+- messages: LLM 流式输出 (category="message")
+- custom:   Agent 业务事件 (category="progress") ⭐ 核心
+
+文档：https://docs.langchain.com/oss/python/langgraph/event-streaming
 """
 
 from typing import Any, AsyncIterator
@@ -17,44 +19,200 @@ from shared.workflow_events.models import (
     WorkflowEvent,
     NodeStartedEvent,
     NodeCompletedEvent,
+    NodeFailedEvent,
     TokenDeltaEvent,
     StateUpdatedEvent,
     WorkflowStartedEvent,
     WorkflowCompletedEvent,
     WorkflowFailedEvent,
-    NodeFailedEvent,
     CustomEvent,
 )
+from shared.workflow_events.kinds import BusinessEvent
 
 import uuid
 
 
 class ProjectionMapper:
-    """LangGraph v3 Typed Projection → WorkflowEvent 转换器。
+    """将 LangGraph v3 单事件流转换为 WorkflowEvent。
 
-    使用方法：
-        mapper = ProjectionMapper(workflow_id="xxx")
-        async for event in mapper.map_stream(graph, input, config):
-            yield event
+    v3 事件格式 (ProtocolEvent):
+        {
+            "type": "event",
+            "seq": 1,
+            "method": "values" | "messages" | "custom",
+            "params": {
+                "namespace": [...],
+                "timestamp": ...,
+                "data": {...}
+            }
+        }
 
-    v3 Projection 映射：
-        - messages       → TOKEN_DELTA (LLM token 流)
-        - values         → STATE_UPDATED (状态快照)
-        - extensions     → TOKEN_DELTA / NODE_STARTED (Node 写入的自定义事件)
+    custom 事件格式 (Agent 发送):
+        {
+            "event": "analysis_started" | "analysis_completed" | ...,
+            "message": "正在分析...",
+            "result": {...},
+            "error": "..."
+        }
     """
 
     def __init__(self, workflow_id: str | None = None):
         self.workflow_id = workflow_id or str(uuid.uuid4())
+        self._sequence = 0
 
-    def map_stream(
+    def next_sequence(self) -> int:
+        """获取下一个序列号（用于事件追踪）。"""
+        self._sequence += 1
+        return self._sequence
+
+    def transform(self, raw_event: dict[str, Any]) -> WorkflowEvent | None:
+        """将 LangGraph v3 ProtocolEvent 转换为 WorkflowEvent。
+
+        Args:
+            raw_event: LangGraph v3 原始事件 (ProtocolEvent)
+
+        Returns:
+            WorkflowEvent 或 None（事件被过滤）
+        """
+        method = raw_event.get("method", "")
+        params = raw_event.get("params", {})
+        data = params.get("data", {})
+
+        # 使用 v3 事件自带的 seq，如果不存在则自增
+        v3_seq = raw_event.get("seq")
+        if v3_seq is not None:
+            sequence = v3_seq
+        else:
+            sequence = self.next_sequence()
+
+        # ── values 事件 (State 更新) ───────────────────────────────────
+        if method == "values":
+            return StateUpdatedEvent.create(
+                workflow_id=self.workflow_id,
+                state=data,
+            )
+
+        # ── messages 事件 (LLM 消息) ─────────────────────────────────────
+        if method == "messages":
+            content = self._extract_message_content(data)
+            if content:
+                return TokenDeltaEvent.create(
+                    workflow_id=self.workflow_id,
+                    delta=content,
+                )
+            return None
+
+        # ── custom 事件 (业务进度) ⭐ 核心 ────────────────────────────────
+        if method == "custom":
+            return self._transform_custom_event(data, sequence)
+
+        return None
+
+    def _extract_message_content(self, data: Any) -> str:
+        """从消息对象中提取文本内容。"""
+        content = ""
+        if hasattr(data, "content"):
+            if isinstance(data.content, list):
+                for item in data.content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        content += item.get("text", "")
+                    elif isinstance(item, str):
+                        content += item
+            elif isinstance(data.content, str):
+                content = data.content
+            elif hasattr(data.content, "text"):
+                content = data.content.text
+        return content
+
+    def _transform_custom_event(self, data: dict[str, Any], sequence: int) -> WorkflowEvent | None:
+        """将 custom 事件转换为业务 WorkflowEvent。
+
+        Agent 通过 get_stream_writer() 发送的事件格式:
+            {
+                "event": "analysis_started",
+                "message": "正在分析客户评论",
+                "result": {...},
+                "error": "..."
+            }
+
+        Args:
+            data: custom 事件的数据部分
+
+        Returns:
+            转换后的 WorkflowEvent
+        """
+        event_type = data.get("event", "")
+        message = data.get("message", "")
+
+        # ── Analysis 阶段 ──────────────────────────────────────────────
+        if event_type == BusinessEvent.ANALYSIS_STARTED:
+            return NodeStartedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="analysis",
+                display_name="分析评论中",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.ANALYSIS_COMPLETED:
+            return NodeCompletedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="analysis",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.ANALYSIS_FAILED:
+            error = data.get("error", "unknown")
+            return NodeFailedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="analysis",
+                error=error,
+                sequence=sequence,
+            )
+
+        # ── Generation 阶段 ─────────────────────────────────────────────
+        if event_type == BusinessEvent.GENERATION_STARTED:
+            return NodeStartedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="generation",
+                display_name="回复生成中",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.GENERATION_COMPLETED:
+            return NodeCompletedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="generation",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.GENERATION_FAILED:
+            error = data.get("error", "unknown")
+            return NodeFailedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="generation",
+                error=error,
+                sequence=sequence,
+            )
+
+        # ── 其他 custom 事件（透传）──────────────────────────────────────
+        if event_type:
+            return CustomEvent.create(
+                workflow_id=self.workflow_id,
+                event_type=event_type,
+                data={"message": message, **data},
+            )
+
+        return None
+
+    async def map_stream(
         self,
         graph,
         input: dict[str, Any],
         config: dict[str, Any] | None = None,
     ) -> AsyncIterator[WorkflowEvent]:
-        """将 LangGraph astream_events(v3) 转换为 WorkflowEvent 流。
+        """单 iterator 消费 LangGraph v3 事件流。
 
-        调用 graph.astream_events(version="v3")，返回 AsyncGraphRunStream。
+        简化设计：astream_events 返回 async iterator。
 
         Args:
             graph: 编译后的 LangGraph
@@ -62,229 +220,23 @@ class ProjectionMapper:
             config: LangGraph config
 
         Yields:
-            WorkflowEvent 事件序列
+            WorkflowEvent 序列
         """
-        return self._map_stream_impl(graph, input, config)
-
-    async def _map_stream_impl(
-        self,
-        graph,
-        input: dict[str, Any],
-        config: dict[str, Any] | None = None,
-    ) -> AsyncIterator[WorkflowEvent]:
-        """内部实现：消费 v3 Typed Projections。"""
-        import asyncio
-
         yield WorkflowStartedEvent.create(self.workflow_id)
 
         try:
-            # v3: astream_events 返回 Awaitable[AsyncGraphRunStream]
-            stream = await graph.astream_events(input, config=config, version="v3")
+            # astream_events 是 coroutine，需要先 await 获取 async iterator
+            stream = await graph.astream_events(
+                input,
+                config=config,
+                version="v3",
+            )
+            async for raw_event in stream:
+                event = self.transform(raw_event)
+                if event:
+                    yield event
 
-            # 并发消费所有 projections
-            tasks = [
-                self._consume_messages(stream.messages),
-                self._consume_values(stream.values),
-                self._consume_extensions(stream.extensions),
-            ]
-
-            async for event in _merge_async_iterators(*tasks):
-                yield event
-
-            # v3: stream.output 是属性，不是方法
-            output = stream.output
-            if output:
-                output_dict = dict(output) if hasattr(output, 'keys') else output
-            else:
-                output_dict = None
-
-            yield WorkflowCompletedEvent.create(self.workflow_id, output_dict)
+            yield WorkflowCompletedEvent.create(self.workflow_id, None)
 
         except Exception as e:
             yield WorkflowFailedEvent.create(self.workflow_id, str(e))
-            raise
-
-    async def _consume_messages(self, channel) -> AsyncIterator[WorkflowEvent]:
-        """消费 messages projection → TOKEN_DELTA。
-
-        v3 messages 事件类型：
-        - message-start         → 消息开始
-        - content-block-start   → 内容块开始
-        - content-block-delta   → token delta
-        - content-block-finish  → 内容块完成
-        - message-finish        → 消息完成
-        """
-        try:
-            async for msg in channel:
-                delta = _extract_message_delta(msg)
-                if delta:
-                    yield TokenDeltaEvent.create(
-                        workflow_id=self.workflow_id,
-                        delta=delta,
-                        source="llm",
-                    )
-        except TypeError:
-            pass
-
-    async def _consume_values(self, channel) -> AsyncIterator[WorkflowEvent]:
-        """消费 values projection → STATE_UPDATED。"""
-        try:
-            async for value in channel:
-                if value and isinstance(value, dict):
-                    yield StateUpdatedEvent.create(self.workflow_id, value)
-        except TypeError:
-            pass
-
-    async def _consume_extensions(
-        self, extensions
-    ) -> AsyncIterator[WorkflowEvent]:
-        """消费 extensions projection → WorkflowEvent。
-
-        extensions 包含 Node 通过 get_stream_writer() 写入的自定义事件。
-        常见事件格式：
-        - {"type": "node_started", "node": "analysis"}
-        - {"type": "token", "delta": "hello"}
-        - {"type": "node_completed", "node": "analysis"}
-        """
-        if not extensions:
-            return
-
-        for name, channel in extensions.items():
-            if name in ("values", "messages", "lifecycle", "subgraphs"):
-                continue
-
-            try:
-                async for event in _safe_channel_iter(channel):
-                    if event is None:
-                        continue
-                    async for mapped in self._parse_extension_event(event):
-                        yield mapped
-            except TypeError:
-                pass
-
-    async def _parse_extension_event(
-        self, event: Any
-    ) -> AsyncIterator[WorkflowEvent]:
-        """解析 extensions 中的自定义事件。"""
-        try:
-            if isinstance(event, dict):
-                event_type = event.get("type", event.get("kind", ""))
-                data = event
-            elif hasattr(event, "type"):
-                event_type = event.type
-                data = getattr(event, "data", {})
-            else:
-                event_type = "custom"
-                data = {"raw": str(event)}
-
-            if event_type == "node_started":
-                yield NodeStartedEvent.create(
-                    workflow_id=self.workflow_id,
-                    node_name=data.get("node", "unknown"),
-                    display_name=data.get("display_name"),
-                )
-            elif event_type == "node_completed":
-                yield NodeCompletedEvent.create(
-                    workflow_id=self.workflow_id,
-                    node_name=data.get("node", "unknown"),
-                )
-            elif event_type == "node_error":
-                yield NodeFailedEvent.create(
-                    workflow_id=self.workflow_id,
-                    node_name=data.get("node", "unknown"),
-                    error=data.get("error", "unknown"),
-                )
-            elif event_type in ("token", "content-block-delta"):
-                delta = data.get("delta", data.get("content", ""))
-                if delta:
-                    yield TokenDeltaEvent.create(
-                        workflow_id=self.workflow_id,
-                        delta=str(delta),
-                        source=data.get("source", "agent"),
-                    )
-            elif event_type == "custom":
-                yield CustomEvent.create(
-                    workflow_id=self.workflow_id,
-                    event_type=data.get("event_type", "custom"),
-                    data=data,
-                    source=data.get("source"),
-                )
-        except Exception:
-            pass
-
-
-def _extract_message_delta(msg: Any) -> str | None:
-    """从 LangChain AIMessageChunk 提取 token delta。
-
-    v3 messages channel 返回 AIMessageChunk，内容可能是：
-    - str: 直接是文本
-    - list: [{"type": "text", "text": "..."}]
-    """
-    if not hasattr(msg, "content"):
-        return None
-
-    content = msg.content
-    if not content:
-        return None
-
-    if isinstance(content, str):
-        return content
-
-    if isinstance(content, list):
-        for block in content:
-            if isinstance(block, dict):
-                if block.get("type") == "text":
-                    return block.get("text", "")
-            elif hasattr(block, "text"):
-                return str(block.text)
-        if content:
-            first = content[0]
-            if isinstance(first, dict):
-                return str(first.get("text", ""))
-            return str(first)
-    return None
-
-
-async def _safe_channel_iter(channel) -> AsyncIterator[Any]:
-    """安全迭代 channel，处理 sync/async 差异。"""
-    try:
-        async for item in channel:
-            yield item
-    except TypeError:
-        for item in channel:
-            yield item
-
-
-async def _merge_async_iterators(
-    *iterators,
-) -> AsyncIterator[WorkflowEvent]:
-    """合并多个 AsyncIterator，按 yield 顺序输出。"""
-    import asyncio
-
-    async def iter_to_queue(it, queue):
-        try:
-            async for item in it:
-                await queue.put(item)
-        except Exception as e:
-            await queue.put(e)
-        finally:
-            await queue.put(None)
-
-    queue = asyncio.Queue()
-    iterators = [it for it in iterators if it is not None]
-
-    if not iterators:
-        return
-
-    tasks = [asyncio.create_task(iter_to_queue(it, queue)) for it in iterators]
-    pending = len(tasks)
-
-    while pending > 0:
-        item = await queue.get()
-        if item is None:
-            pending -= 1
-        elif isinstance(item, Exception):
-            raise item
-        else:
-            yield item
-            queue.task_done()
