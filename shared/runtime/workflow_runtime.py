@@ -48,6 +48,19 @@ class WorkflowRuntime:
         self._checkpointer = None
         self._started = False
 
+    def get_workflow(self, workflow_name: str):
+        """获取编译后的 workflow graph。
+
+        Args:
+            workflow_name: workflow 名称
+
+        Returns:
+            WorkflowDefinition (包含编译后的 graph)
+        """
+        if not self._started:
+            raise RuntimeError("WorkflowRuntime not started. Call startup() first.")
+        return get_workflow(workflow_name)
+
     async def run(
         self,
         workflow_name: str,

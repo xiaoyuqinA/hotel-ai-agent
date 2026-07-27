@@ -56,8 +56,17 @@ def _build_graph() -> StateGraph:
 
 
 def build_compiled_graph(checkpointer):
-    """返回编译后的 graph。由 WorkflowRuntime 在 startup 时调用。"""
-    return _build_graph().compile(checkpointer=checkpointer)
+    """返回编译后的 graph。由 WorkflowRuntime 在 startup 时调用。
+
+    transformers:
+    - CustomTransformer: 捕获 writer() 写入的自定义事件
+    """
+    from langgraph.stream import CustomTransformer
+
+    return _build_graph().compile(
+        checkpointer=checkpointer,
+        transformers=[CustomTransformer],
+    )
 
 
 def print_graph() -> None:

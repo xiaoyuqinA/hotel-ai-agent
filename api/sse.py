@@ -4,6 +4,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response, StreamingResponse
 
 from shared.workflow_events.models import WorkflowEvent
+from shared.streaming.runner import WorkflowRunner
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -16,28 +17,29 @@ def format_sse_event(event: WorkflowEvent) -> str:
 async def review_operation_stream(request: Request) -> Response:
     """评论运营流式端点。
 
-    POST /review/operation/stream
+    POST /review/stream
     Content-Type: application/json
     {"reviews_content": "...", "thread_id": "xxx"}
 
     返回 SSE 流：
-        data: {"kind": "workflow_started", ...}\n\n
-        data: {"kind": "node_started", "payload": {"node": "analysis"}}\n\n
-        data: {"kind": "token_delta", "payload": {"delta": "正在"}}\n\n
-        data: {"kind": "workflow_completed", ...}\n\n
+        data: {"category": "system", "kind": "workflow_started", ...}\n\n
+        data: {"category": "progress", "kind": "node_started", ...}\n\n
+        data: {"category": "message", "kind": "token_delta", ...}\n\n
+        data: {"category": "system", "kind": "workflow_completed", ...}\n\n
     """
     body = await request.json()
     reviews_content = body.get("reviews_content", "")
     thread_id = body.get("thread_id", "")
 
-    from shared.workflow_events.streaming_runner import stream_workflow
+    runtime = request.app.state.runtime
+    workflow = runtime.get_workflow("review_operation")
 
     async def event_generator():
-        async for event in stream_workflow(
-            "review_operation",
-            reviews_content,
-            thread_id,
-        ):
+        runner = WorkflowRunner()
+        input_data = workflow.input_mapper(reviews_content)
+        config = {"configurable": {"thread_id": thread_id}}
+
+        async for event in runner.run(workflow.graph, input_data, config):
             yield format_sse_event(event)
 
     return StreamingResponse(
