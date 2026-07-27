@@ -223,7 +223,7 @@ class TestProjectionMapperCustom:
         assert isinstance(result, NodeStartedEvent)
         assert result.kind == "node_started"
         assert result.source == "analysis"
-        assert result.payload["display_name"] == "基础分析"
+        assert result.payload["display_name"] == "分析评论中"
         assert result.category == "progress"
 
     def test_generation_completed_transforms_to_node_completed(self):
@@ -286,7 +286,7 @@ class TestProjectionMapperCustom:
         assert result is not None
         assert isinstance(result, NodeStartedEvent)
         assert result.source == "review"
-        assert result.payload["display_name"] == "审核回复"
+        assert result.payload["display_name"] == "审核回复中"
 
     def test_unknown_custom_event_transforms_to_custom_event(self):
         """未知 custom 事件 → CustomEvent"""

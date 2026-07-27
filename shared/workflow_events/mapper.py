@@ -194,6 +194,31 @@ class ProjectionMapper:
                 sequence=sequence,
             )
 
+        # ── Review 阶段 ─────────────────────────────────────────────────
+        if event_type == BusinessEvent.REVIEW_STARTED:
+            return NodeStartedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="review",
+                display_name="审核回复中",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.REVIEW_COMPLETED:
+            return NodeCompletedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="review",
+                sequence=sequence,
+            )
+
+        if event_type == BusinessEvent.REVIEW_FAILED:
+            error = data.get("error", "unknown")
+            return NodeFailedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name="review",
+                error=error,
+                sequence=sequence,
+            )
+
         # ── 其他 custom 事件（透传）──────────────────────────────────────
         if event_type:
             return CustomEvent.create(
