@@ -1,8 +1,18 @@
-"""Typed Projection Mapper — LangGraph v3 Projection → WorkflowEvent 转换器。"""
+"""Typed Projection Mapper — LangGraph v3 Projection → WorkflowEvent 转换器。
+
+基于 LangGraph 官方 Event Streaming 文档：
+https://docs.langchain.com/oss/python/langgraph/event-streaming
+
+v3 Typed Projections:
+    stream.messages    → LLM 消息/token (AIMessageChunk)
+    stream.values      → 状态快照
+    stream.output      → 最终输出（属性，非方法）
+    stream.subgraphs   → 子图
+    stream.extensions  → 自定义事件（get_stream_writer 写入）
+"""
 
 from typing import Any, AsyncIterator
 
-from shared.workflow_events.kinds import EventKind
 from shared.workflow_events.models import (
     WorkflowEvent,
     NodeStartedEvent,
@@ -19,33 +29,22 @@ from shared.workflow_events.models import (
 import uuid
 
 
-# Node 发出的自定义事件类型
-AGENT_NODE_EVENTS = frozenset(["node_started", "node_completed", "node_error", "token"])
-
-
 class ProjectionMapper:
-    """LangGraph v3 Typed Projection 到 WorkflowEvent 的转换器。
+    """LangGraph v3 Typed Projection → WorkflowEvent 转换器。
 
     使用方法：
         mapper = ProjectionMapper(workflow_id="xxx")
         async for event in mapper.map_stream(graph, input, config):
             yield event
 
-    v3 Projection 映射关系：
-        - messages       → TOKEN_DELTA (LangChain ChatModel)
-        - values         → STATE_UPDATED (state 快照)
-        - lifecycle      → NODE_STARTED / NODE_COMPLETED (LangGraph 内置)
-        - extensions     → TOKEN_DELTA / CUSTOM_EVENT (OpenAI Agents SDK)
-
-    对于 extensions channel 中的 agent 事件：
-        Node 通过 get_stream_writer() 写入 {"type": "token", "delta": "..."} 或
-        {"type": "node_started", "node": "generate_reply"} 等。
-        这些事件在 extensions channel 中被消费并转换为 WorkflowEvent。
+    v3 Projection 映射：
+        - messages       → TOKEN_DELTA (LLM token 流)
+        - values         → STATE_UPDATED (状态快照)
+        - extensions     → TOKEN_DELTA / NODE_STARTED (Node 写入的自定义事件)
     """
 
     def __init__(self, workflow_id: str | None = None):
         self.workflow_id = workflow_id or str(uuid.uuid4())
-        self._pending_nodes: set[str] = set()
 
     def map_stream(
         self,
@@ -54,6 +53,8 @@ class ProjectionMapper:
         config: dict[str, Any] | None = None,
     ) -> AsyncIterator[WorkflowEvent]:
         """将 LangGraph astream_events(v3) 转换为 WorkflowEvent 流。
+
+        调用 graph.astream_events(version="v3")，返回 AsyncGraphRunStream。
 
         Args:
             graph: 编译后的 LangGraph
@@ -71,37 +72,48 @@ class ProjectionMapper:
         input: dict[str, Any],
         config: dict[str, Any] | None = None,
     ) -> AsyncIterator[WorkflowEvent]:
-        """内部实现：并发消费所有 v3 projections。"""
+        """内部实现：消费 v3 Typed Projections。"""
         import asyncio
 
-        # 1. 发送 WORKFLOW_STARTED
         yield WorkflowStartedEvent.create(self.workflow_id)
 
         try:
+            # v3: astream_events 返回 Awaitable[AsyncGraphRunStream]
             stream = await graph.astream_events(input, config=config, version="v3")
 
             # 并发消费所有 projections
             tasks = [
                 self._consume_messages(stream.messages),
                 self._consume_values(stream.values),
-                self._consume_lifecycle(stream.lifecycle),
                 self._consume_extensions(stream.extensions),
             ]
 
-            # 使用并发迭代器收集所有事件
             async for event in _merge_async_iterators(*tasks):
                 yield event
 
-            # 获取最终输出
-            output = await stream.output()
-            yield WorkflowCompletedEvent.create(self.workflow_id, output)
+            # v3: stream.output 是属性，不是方法
+            output = stream.output
+            if output:
+                output_dict = dict(output) if hasattr(output, 'keys') else output
+            else:
+                output_dict = None
+
+            yield WorkflowCompletedEvent.create(self.workflow_id, output_dict)
 
         except Exception as e:
             yield WorkflowFailedEvent.create(self.workflow_id, str(e))
             raise
 
     async def _consume_messages(self, channel) -> AsyncIterator[WorkflowEvent]:
-        """消费 messages projection → TOKEN_DELTA。"""
+        """消费 messages projection → TOKEN_DELTA。
+
+        v3 messages 事件类型：
+        - message-start         → 消息开始
+        - content-block-start   → 内容块开始
+        - content-block-delta   → token delta
+        - content-block-finish  → 内容块完成
+        - message-finish        → 消息完成
+        """
         try:
             async for msg in channel:
                 delta = _extract_message_delta(msg)
@@ -123,76 +135,37 @@ class ProjectionMapper:
         except TypeError:
             pass
 
-    async def _consume_lifecycle(
-        self, channel
-    ) -> AsyncIterator[WorkflowEvent]:
-        """消费 lifecycle projection → NODE_STARTED / NODE_COMPLETED / NODE_FAILED。"""
-        try:
-            async for event in channel:
-                for mapped in self._parse_lifecycle_event(event):
-                    yield mapped
-        except TypeError:
-            pass
-
-    def _parse_lifecycle_event(self, event: Any) -> AsyncIterator[WorkflowEvent]:
-        """解析 lifecycle 事件。"""
-        if isinstance(event, dict):
-            event_type = event.get("type", "")
-            name = event.get("name", "")
-            error = event.get("error")
-        else:
-            event_type = getattr(event, "type", "")
-            name = getattr(event, "name", "")
-            error = getattr(event, "error")
-
-        if "start" in str(event_type).lower():
-            self._pending_nodes.add(name)
-            yield NodeStartedEvent.create(
-                workflow_id=self.workflow_id,
-                node_name=name,
-            )
-        elif "end" in str(event_type).lower():
-            self._pending_nodes.discard(name)
-            yield NodeCompletedEvent.create(
-                workflow_id=self.workflow_id,
-                node_name=name,
-            )
-        elif "error" in str(event_type).lower() or "fail" in str(event_type).lower():
-            yield NodeFailedEvent.create(
-                workflow_id=self.workflow_id,
-                node_name=name,
-                error=str(error) if error else "unknown",
-            )
-
     async def _consume_extensions(
         self, extensions
     ) -> AsyncIterator[WorkflowEvent]:
         """消费 extensions projection → WorkflowEvent。
 
-        处理 Node 通过 get_stream_writer() 写入的自定义事件。
-        支持两种格式：
-        1. dict: {"type": "token", "delta": "..."} 或 {"type": "node_started", "node": "..."}
-        2. LangGraph StreamPart 格式
+        extensions 包含 Node 通过 get_stream_writer() 写入的自定义事件。
+        常见事件格式：
+        - {"type": "node_started", "node": "analysis"}
+        - {"type": "token", "delta": "hello"}
+        - {"type": "node_completed", "node": "analysis"}
         """
         if not extensions:
             return
 
         for name, channel in extensions.items():
-            if name in ("values", "messages", "lifecycle"):
+            if name in ("values", "messages", "lifecycle", "subgraphs"):
                 continue
 
-            async for event in _safe_channel_iter(channel):
-                if event is None:
-                    continue
-
-                # 尝试解析事件
-                async for mapped in self._parse_extension_event(event):
-                    yield mapped
+            try:
+                async for event in _safe_channel_iter(channel):
+                    if event is None:
+                        continue
+                    async for mapped in self._parse_extension_event(event):
+                        yield mapped
+            except TypeError:
+                pass
 
     async def _parse_extension_event(
         self, event: Any
     ) -> AsyncIterator[WorkflowEvent]:
-        """解析 extensions channel 中的事件。"""
+        """解析 extensions 中的自定义事件。"""
         try:
             if isinstance(event, dict):
                 event_type = event.get("type", event.get("kind", ""))
@@ -200,33 +173,28 @@ class ProjectionMapper:
             elif hasattr(event, "type"):
                 event_type = event.type
                 data = getattr(event, "data", {})
-                if isinstance(data, dict):
-                    data = {"raw": data}
-                else:
-                    data = {"raw": str(data)}
             else:
                 event_type = "custom"
                 data = {"raw": str(event)}
 
-            # 处理 agent node 事件
             if event_type == "node_started":
                 yield NodeStartedEvent.create(
                     workflow_id=self.workflow_id,
-                    node_name=data.get("node", data.get("name", "unknown")),
+                    node_name=data.get("node", "unknown"),
                     display_name=data.get("display_name"),
                 )
             elif event_type == "node_completed":
                 yield NodeCompletedEvent.create(
                     workflow_id=self.workflow_id,
-                    node_name=data.get("node", data.get("name", "unknown")),
+                    node_name=data.get("node", "unknown"),
                 )
             elif event_type == "node_error":
                 yield NodeFailedEvent.create(
                     workflow_id=self.workflow_id,
-                    node_name=data.get("node", data.get("name", "unknown")),
+                    node_name=data.get("node", "unknown"),
                     error=data.get("error", "unknown"),
                 )
-            elif event_type == "token":
+            elif event_type in ("token", "content-block-delta"):
                 delta = data.get("delta", data.get("content", ""))
                 if delta:
                     yield TokenDeltaEvent.create(
@@ -246,23 +214,39 @@ class ProjectionMapper:
 
 
 def _extract_message_delta(msg: Any) -> str | None:
-    """从 LangChain message 对象提取 token delta。"""
-    if hasattr(msg, "content") and msg.content:
-        content = msg.content
-        if isinstance(content, list):
-            for block in content:
-                if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        return block.get("text", "")
-                elif hasattr(block, "text"):
-                    return block.text
-            return str(content[0]) if content else None
-        return str(content)
+    """从 LangChain AIMessageChunk 提取 token delta。
+
+    v3 messages channel 返回 AIMessageChunk，内容可能是：
+    - str: 直接是文本
+    - list: [{"type": "text", "text": "..."}]
+    """
+    if not hasattr(msg, "content"):
+        return None
+
+    content = msg.content
+    if not content:
+        return None
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    return block.get("text", "")
+            elif hasattr(block, "text"):
+                return str(block.text)
+        if content:
+            first = content[0]
+            if isinstance(first, dict):
+                return str(first.get("text", ""))
+            return str(first)
     return None
 
 
 async def _safe_channel_iter(channel) -> AsyncIterator[Any]:
-    """安全地迭代 channel，处理 sync/async 差异。"""
+    """安全迭代 channel，处理 sync/async 差异。"""
     try:
         async for item in channel:
             yield item

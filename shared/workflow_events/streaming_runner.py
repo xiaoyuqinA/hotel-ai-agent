@@ -6,7 +6,7 @@ from shared.registry.workflow_registry import get_workflow
 from shared.streaming.runner import WorkflowRunner
 
 
-def stream_workflow(
+async def stream_workflow(
     workflow_name: str,
     user_input: Any,
     thread_id: str,
@@ -25,15 +25,6 @@ def stream_workflow(
     Yields:
         WorkflowEvent 事件序列
     """
-    return _stream_workflow_impl(workflow_name, user_input, thread_id)
-
-
-async def _stream_workflow_impl(
-    workflow_name: str,
-    user_input: Any,
-    thread_id: str,
-):
-    """内部异步实现。"""
     workflow = get_workflow(workflow_name)
     input_data = workflow.input_mapper(user_input)
     config = {"configurable": {"thread_id": thread_id}}
