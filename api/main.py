@@ -6,7 +6,6 @@ from fastapi import FastAPI
 
 from api.routes import router as agent_router
 from api.sse import router as sse_router
-from api.admin import router as admin_router
 from shared.runtime.workflow_runtime import WorkflowRuntime
 
 # ── Global Runtime ──────────────────────────────────────────────────────────────
@@ -54,5 +53,4 @@ app = FastAPI(
 
 app.include_router(agent_router)
 app.include_router(sse_router)
-app.include_router(admin_router)  # Phase 3
 app.state.runtime = _runtime
