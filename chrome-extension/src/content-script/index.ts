@@ -11,17 +11,16 @@
  */
 
 import { createStore } from '../state/workflow-store.js';
-import { OTAAdapter } from './ota-adapter.js';
+import type { OTAAdapter } from './adapters/types.js';
+import { detectAdapter } from './adapters/registry.js';
 
 const store = createStore();
-let tabId = null;
-
 const CURRENT_HOTEL_KEY = 'current_hotel';
 
-let _otaAdapter = null;
+let _adapter: OTAAdapter | null = null;
 function getAdapter() {
-  if (!_otaAdapter) _otaAdapter = OTAAdapter.detect();
-  return _otaAdapter;
+  if (!_adapter) _adapter = detectAdapter();
+  return _adapter;
 }
 
 // ── Hotel Context（只读） ────────────────────────────────────────────────────
@@ -33,10 +32,7 @@ async function _getCurrentHotel() {
 
 // ── 初始化 ─────────────────────────────────────────────────────────────────
 
-async function init() {
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  tabId = tab.id;
-
+function init() {
   chrome.runtime.onMessage.addListener(handleMessage);
   injectStyles();
   injectFAB();
@@ -218,7 +214,9 @@ function renderNoHotel() {
 
 async function renderIdle() {
   const hotel = await _getCurrentHotel();
-  const review = store.getReview() || getAdapter().getReviewContent();
+  const adapter = getAdapter();
+  const ctx = adapter ? await adapter.getReview() : null;
+  const review = store.getReview() || ctx?.content || '';
 
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
@@ -373,7 +371,14 @@ async function onGenerate() {
   }
 
   const adapter = getAdapter();
-  const review = adapter.getReviewContent();
+  if (!adapter) {
+    updateStatus('error', '当前页面不支持');
+    setPanelView('idle');
+    return;
+  }
+
+  const ctx = await adapter.getReview();
+  const review = ctx?.content ?? '';
   if (!review) {
     updateStatus('error', '无法获取评论内容');
     setPanelView('idle');
@@ -391,14 +396,20 @@ async function onGenerate() {
   });
 }
 
-function onPublish() {
+async function onPublish() {
   const reply = store.getReply();
   if (!reply) return;
 
   setPanelView('publishing');
 
   const adapter = getAdapter();
-  const filled = adapter.fillReply(reply);
+  if (!adapter) {
+    store.setError('无可用 Adapter');
+    setPanelView('error');
+    return;
+  }
+
+  const filled = await adapter.fillReply(reply);
 
   if (!filled) {
     store.setError('无法找到 OTA 页面回复框');
@@ -406,15 +417,13 @@ function onPublish() {
     return;
   }
 
-  // 尝试触发发布（即使失败也不算严重错误，回复已填入）
-  const published = adapter.publish();
-
-  if (published) {
+  // MVP: publish() 会 throw，不自动发布，回复已填入让用户手动确认
+  try {
+    await adapter.publish();
     setPanelView('published');
     setTimeout(() => dismissPanel(), 2000);
     setFABState('idle');
-  } else {
-    // 回复已填入但没找到发布按钮 — 用户自己点
+  } catch {
     updateStatus('completed', '回复已填入，请手动发布');
     setPanelView('completed');
   }
@@ -552,5 +561,4 @@ function getStyles() {
 
 // ── 初始化 ───────────────────────────────────────────────────────────────────
 
-let tab;
 init();
