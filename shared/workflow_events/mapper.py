@@ -78,9 +78,10 @@ class ProjectionMapper:
         params = raw_event.get("params", {})
         data = params.get("data", {})
 
-        # 使用 v3 事件自带的 seq，如果不存在则自增
+        # 使用 v3 事件自带的 seq，如果不存在或为 0 则自增。
+        # custom 事件的 seq 总是 0（由 writer() 发送，非 astream_events 原生）
         v3_seq = raw_event.get("seq")
-        if v3_seq is not None:
+        if v3_seq and v3_seq > 0:
             sequence = v3_seq
         else:
             sequence = self.next_sequence()
@@ -126,7 +127,9 @@ class ProjectionMapper:
                 content = data.content.text
         return content
 
-    def _transform_custom_event(self, data: dict[str, Any], sequence: int) -> WorkflowEvent | None:
+    def _transform_custom_event(
+        self, data: dict[str, Any], sequence: int
+    ) -> WorkflowEvent | None:
         """将 custom 事件转换为业务 WorkflowEvent。
 
         Agent 通过 get_stream_writer() 发送的事件格式:
@@ -221,6 +224,18 @@ class ProjectionMapper:
                 sequence=sequence,
             )
 
+        # ── Token Delta（流式输出）──────────────────────────────────────
+        if event_type == "token_delta":
+            delta = data.get("delta", "")
+            if delta:
+                event = TokenDeltaEvent.create(
+                    workflow_id=self.workflow_id,
+                    delta=delta,
+                    source="generation",
+                )
+                event.sequence = sequence
+                return event
+
         # ── 其他 custom 事件（透传）──────────────────────────────────────
         if event_type:
             return CustomEvent.create(
@@ -257,12 +272,16 @@ class ProjectionMapper:
                 config=config,
                 version="v3",
             )
+            final_state: dict[str, Any] = {}
             async for raw_event in stream:
                 event = self.transform(raw_event)
                 if event:
                     yield event
+                # 记录最后一个 values 事件的 state（包含节点返回的完整结果）
+                if raw_event.get("method") == "values":
+                    final_state = raw_event.get("params", {}).get("data", {})
 
-            yield WorkflowCompletedEvent.create(self.workflow_id, None)
+            yield WorkflowCompletedEvent.create(self.workflow_id, final_state or None)
 
         except Exception as e:
             yield WorkflowFailedEvent.create(self.workflow_id, str(e))

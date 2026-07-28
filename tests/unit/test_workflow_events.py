@@ -44,7 +44,12 @@ class TestWorkflowEventModel:
 
     def test_workflow_event_create(self):
         """测试基本 WorkflowEvent 创建。"""
-        event = WorkflowEvent(workflow_id="wf-001", kind="test_event", category="progress", payload={"key": "value"})
+        event = WorkflowEvent(
+            workflow_id="wf-001",
+            kind="test_event",
+            category="progress",
+            payload={"key": "value"},
+        )
         assert event.workflow_id == "wf-001"
         assert event.kind == "test_event"
         assert event.category == "progress"
@@ -198,6 +203,67 @@ class TestWorkflowCategory:
 
         for name, value in expected.items():
             assert getattr(WorkflowCategory, name).value == value
+
+
+class TestProjectionMapperCompletion:
+    """ProjectionMapper workflow_completed 携带 final_state 测试。"""
+
+    @pytest.mark.asyncio
+    async def test_workflow_completed_carries_final_state(self):
+        """workflow_completed 事件应携带最终 state（含 reply_content）。"""
+        from langgraph.graph import StateGraph
+
+        class TestState(TypedDict):
+            reply_content: str | None
+
+        def generate_node(state):
+            return {"reply_content": "感谢您的反馈"}
+
+        builder = StateGraph(TestState)
+        builder.add_node("generate", generate_node)
+        builder.set_entry_point("generate")
+        builder.set_finish_point("generate")
+        graph = builder.compile()
+
+        runner = WorkflowRunner(workflow_id="test-completion")
+        events = []
+
+        async for event in runner.run(graph, {"reply_content": None}):
+            events.append(event)
+
+        assert len(events) >= 2
+        completed = events[-1]
+        assert completed.kind == "workflow_completed"
+        # 验证 result 携带了 reply_content
+        result = completed.payload.get("result")
+        assert result is not None
+        assert result.get("reply_content") == "感谢您的反馈"
+
+    @pytest.mark.asyncio
+    async def test_workflow_completed_without_state(self):
+        """无自定义 state 返回时，workflow_completed 事件仍正常产生。"""
+        from langgraph.graph import StateGraph
+
+        class EmptyState(TypedDict):
+            pass
+
+        builder = StateGraph(EmptyState)
+        builder.add_node("noop", lambda x: {})
+        builder.set_entry_point("noop")
+        builder.set_finish_point("noop")
+        graph = builder.compile()
+
+        runner = WorkflowRunner(workflow_id="test-empty")
+        events = []
+
+        async for event in runner.run(graph, {}):
+            events.append(event)
+
+        completed = events[-1]
+        assert completed.kind == "workflow_completed"
+        # 无自定义 state 时 result 不包含 reply_content
+        result = completed.payload.get("result")
+        assert result is None or "reply_content" not in result
 
 
 class TestProjectionMapperCustom:
