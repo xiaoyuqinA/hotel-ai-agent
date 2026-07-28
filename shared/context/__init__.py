@@ -2,7 +2,7 @@
 
 from shared.context.exceptions import HotelContextNotFound
 from shared.context.hotel_context import (
-    BrandVoice,
+    ReplySettings,
     HotelContext,
     HotelPolicies,
     HotelProfile,
@@ -13,7 +13,7 @@ __all__ = [
     "HotelContext",
     "HotelProfile",
     "HotelPolicies",
-    "BrandVoice",
+    "ReplySettings",
     "HotelContextLoader",
     "HotelContextNotFound",
 ]

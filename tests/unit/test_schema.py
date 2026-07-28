@@ -27,7 +27,6 @@ class TestCustomerSentiment:
 class TestReviewAnalysisResult:
     def test_full_model(self):
         result = ReviewAnalysisResult(
-            original_comment="test",
             issue_severity=IssueSeverity(level="Low", reason="test"),
             customer_sentiment=CustomerSentiment(label="positive", confidence=0.9),
             customer_intent="praise",
@@ -37,7 +36,6 @@ class TestReviewAnalysisResult:
     def test_valid_intents(self):
         for intent in ["praise", "complaint", "suggestion", "inquiry", "request", "mixed"]:
             result = ReviewAnalysisResult(
-                original_comment="test",
                 issue_severity=IssueSeverity(level="Low", reason="r"),
                 customer_sentiment=CustomerSentiment(label="positive", confidence=1.0),
                 customer_intent=intent,
@@ -46,10 +44,9 @@ class TestReviewAnalysisResult:
 
     def test_model_dump_json(self):
         result = ReviewAnalysisResult(
-            original_comment="test",
             issue_severity=IssueSeverity(level="Low", reason="r"),
             customer_sentiment=CustomerSentiment(label="positive", confidence=0.9),
             customer_intent="praise",
         )
         json_str = result.model_dump_json()
-        assert "original_comment" in json_str
+        assert '"customer_intent":"praise"' in json_str.replace(" ", "")

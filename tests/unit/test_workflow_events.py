@@ -90,12 +90,11 @@ class TestWorkflowRunner:
         async for event in runner.run(simple_graph, {"value": "start"}):
             events.append(event)
 
-        # 验证事件序列
-        assert len(events) >= 2  # 至少 workflow_started 和 workflow_completed
+        # 验证事件序列 — workflow_started 由上游 sse.py 负责，
+        # mapper 不再产出，所以第一个事件可能是 state_updated
+        assert len(events) >= 2
 
-        assert events[0].kind == "workflow_started"
-        assert events[0].workflow_id == "test-wf-001"
-
+        # 只要最后一个事件是 workflow_completed 即可
         assert events[-1].kind == "workflow_completed"
         assert events[-1].workflow_id == "test-wf-001"
 
@@ -114,8 +113,8 @@ class TestWorkflowRunner:
             events.append(event)
 
         # 验证至少有事开始和结束事件
+        # 注意：workflow_started 由上游 sse.py 负责，mapper 不再产出
         assert len(events) >= 2
-        assert events[0].kind == "workflow_started"
         assert events[-1].kind == "workflow_completed"
 
     @pytest.mark.asyncio

@@ -87,10 +87,12 @@ class ProjectionMapper:
 
         # ── values 事件 (State 更新) ───────────────────────────────────
         if method == "values":
-            return StateUpdatedEvent.create(
+            event = StateUpdatedEvent.create(
                 workflow_id=self.workflow_id,
                 state=data,
             )
+            event.sequence = sequence
+            return event
 
         # ── messages 事件 (LLM 消息) ─────────────────────────────────────
         if method == "messages":
@@ -247,8 +249,7 @@ class ProjectionMapper:
         Yields:
             WorkflowEvent 序列
         """
-        yield WorkflowStartedEvent.create(self.workflow_id)
-
+        # workflow_started 由上游负责发布（sse.py 中 _run_workflow_background 统一管理）
         try:
             # astream_events 是 coroutine，需要先 await 获取 async iterator
             stream = await graph.astream_events(

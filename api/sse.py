@@ -8,6 +8,7 @@ GET /review/stream/{run_id}
 """
 
 import asyncio
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Request, HTTPException
@@ -18,12 +19,14 @@ from shared.workflow_events.models import (
     WorkflowStartedEvent,
     WorkflowCompletedEvent,
     WorkflowFailedEvent,
+    WorkflowCancelledEvent,
 )
 from shared.workflow_events.event_store import (
     create_run_record,
     get_run_record,
     save_and_publish,
     subscribe_with_history,
+    cancel_workflow_run,
 )
 from shared.streaming.runner import WorkflowRunner
 
@@ -40,36 +43,41 @@ async def _run_workflow_background(
     workflow_name: str,
     input_data: dict,
     config: dict,
+    runtime,
 ) -> None:
     """后台任务：运行 LangGraph 并发布事件到 PostgreSQL + Redis。"""
-    from shared.runtime.workflow_runtime import _runtime
     from shared.workflow_events.event_store import update_run_status
 
     try:
-        # 更新状态为 running
-        await update_run_status(run_id, "running")
-
-        # 发布 workflow_started
-        await save_and_publish(WorkflowStartedEvent.create(run_id))
-
-        # 获取 workflow graph
-        runtime = _runtime()
         workflow = runtime.get_workflow(workflow_name)
 
-        # 运行 workflow
+        await update_run_status(run_id, "running")
+
+        started_event = WorkflowStartedEvent.create(run_id)
+        await save_and_publish(started_event)
+
         runner = WorkflowRunner(workflow_id=run_id)
 
         result = None
+        terminal_published = False
         async for event in runner.run(workflow.graph, input_data, config):
             await save_and_publish(event)
-            if event.kind == "workflow_completed":
+            if event.kind in ("workflow_completed", "workflow_failed"):
+                terminal_published = True
                 result = event.payload.get("result")
 
-        await update_run_status(run_id, "completed", result=result)
+        if not terminal_published and runner.is_cancelled:
+            await save_and_publish(WorkflowCancelledEvent.create(run_id))
+            await update_run_status(run_id, "cancelled")
+        else:
+            await update_run_status(run_id, "completed", result=result)
 
     except Exception as e:
         await save_and_publish(WorkflowFailedEvent.create(run_id, str(e)))
-        await update_run_status(run_id, "failed", error=str(e))
+        try:
+            await update_run_status(run_id, "failed", error=str(e))
+        except Exception:
+            pass
 
 
 async def create_review_run(request: Request) -> dict:
@@ -77,7 +85,7 @@ async def create_review_run(request: Request) -> dict:
 
     POST /review/run
     Content-Type: application/json
-    {"reviews_content": "...", "thread_id": "xxx"}
+    {"reviews_content": "...", "thread_id": "xxx", "hotel_id": "hotel_001"}
 
     返回：
     {"run_id": "run_xxx", "status": "pending"}
@@ -85,12 +93,12 @@ async def create_review_run(request: Request) -> dict:
     body = await request.json()
     reviews_content = body.get("reviews_content", "")
     thread_id = body.get("thread_id", "")
+    hotel_id = body.get("hotel_id", "")
 
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
 
     # 生成 run_id 和 thread_id
-    import uuid
     run_id = f"run_{uuid.uuid4().hex[:12]}"
     thread_id = thread_id or f"thread_{uuid.uuid4().hex[:12]}"
 
@@ -103,7 +111,12 @@ async def create_review_run(request: Request) -> dict:
     )
 
     # 准备 input 和 config
-    input_data = workflow.input_mapper(reviews_content)
+    # 如果前端传了 hotel_id，以 tuple (hotel_id, reviews_content) 形式传入
+    # input_mapper 会解析出 hotel_id
+    if hotel_id:
+        input_data = workflow.input_mapper((hotel_id, reviews_content))
+    else:
+        input_data = workflow.input_mapper(reviews_content)
     config = {"configurable": {"thread_id": thread_id}}
 
     # 启动后台任务
@@ -113,6 +126,7 @@ async def create_review_run(request: Request) -> dict:
             "review_operation",
             input_data,
             config,
+            runtime,
         )
     )
 
@@ -155,8 +169,12 @@ async def stream_review_run(request: Request, run_id: str) -> Response:
         async for event in subscribe_with_history(run_id, last_sequence):
             yield format_sse_event(event)
 
-            # workflow_completed 后退出
-            if event.kind == "workflow_completed":
+            # workflow_completed / workflow_failed / workflow_cancelled 后退出
+            if event.kind in (
+                "workflow_completed",
+                "workflow_failed",
+                "workflow_cancelled",
+            ):
                 break
 
     return StreamingResponse(
@@ -208,4 +226,40 @@ router.add_api_route(
     methods=["GET"],
     summary="获取 Workflow Run 状态",
     description="查询 Workflow Run 的当前状态和结果",
+)
+
+
+async def _do_cancel_workflow_run(run_id: str) -> dict:
+    """取消 Workflow Run。
+
+    POST /review/run/{run_id}/cancel
+
+    返回：
+    {"success": true, "run_id": "...", "message": "Workflow cancelled"}
+    """
+    run = await get_run_record(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+
+    if run.get("status") in ("completed", "failed", "cancelled"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel workflow with status: {run.get('status')}",
+        )
+
+    await cancel_workflow_run(run_id)
+
+    return {
+        "success": True,
+        "run_id": run_id,
+        "message": "Workflow cancelled",
+    }
+
+
+router.add_api_route(
+    "/run/{run_id}/cancel",
+    _do_cancel_workflow_run,
+    methods=["POST"],
+    summary="取消 Workflow Run",
+    description="取消正在运行的 Workflow Run",
 )

@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+import json
 import uuid
 import time
 
@@ -105,7 +106,9 @@ class NodeCompletedEvent(WorkflowEvent):
     source: str
 
     @classmethod
-    def create(cls, workflow_id: str, node_name: str, sequence: int = 0) -> "NodeCompletedEvent":
+    def create(
+        cls, workflow_id: str, node_name: str, sequence: int = 0
+    ) -> "NodeCompletedEvent":
         """创建节点完成事件。
 
         Args:
@@ -169,13 +172,22 @@ class StateUpdatedEvent(WorkflowEvent):
 
         Args:
             workflow_id: 工作流 ID
-            state: 当前 state 快照
+            state: 当前 state 快照（自动过滤不可序列化对象）
         """
+        serializable_state = {}
+        for key, value in state.items():
+            try:
+                json.dumps({"test": value})
+                serializable_state[key] = value
+            except (TypeError, ValueError):
+                # 不可序列化的对象，转换为字符串表示
+                serializable_state[key] = f"<{type(value).__name__}>"
+
         return cls(
             workflow_id=workflow_id,
             category="state",
             kind="state_updated",
-            payload={"state": state},
+            payload={"state": serializable_state},
         )
 
 
@@ -247,6 +259,28 @@ class WorkflowFailedEvent(WorkflowEvent):
             kind="workflow_failed",
             source="system",
             payload={"error": error},
+        )
+
+
+class WorkflowCancelledEvent(WorkflowEvent):
+    """工作流被取消事件。"""
+
+    kind: str = Field(default="workflow_cancelled")
+    category: str = Field(default="system")
+
+    @classmethod
+    def create(cls, workflow_id: str) -> "WorkflowCancelledEvent":
+        """创建工作流取消事件。
+
+        Args:
+            workflow_id: 工作流 ID
+        """
+        return cls(
+            workflow_id=workflow_id,
+            category="system",
+            kind="workflow_cancelled",
+            source="system",
+            payload={},
         )
 
 

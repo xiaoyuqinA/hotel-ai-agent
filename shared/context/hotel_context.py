@@ -3,7 +3,9 @@
 提供 Review Reply Workflow 生成酒店回复所需的基础信息。
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from shared.hotel_config.models import ReplySettings  # noqa: F401
 
 
 @dataclass(frozen=True)
@@ -28,15 +30,6 @@ class HotelPolicies:
 
 
 @dataclass(frozen=True)
-class BrandVoice:
-    """酒店回复风格。"""
-
-    tone: str
-    reply_style: str
-    rules: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
 class HotelContext:
     """酒店运行上下文。
 
@@ -46,4 +39,4 @@ class HotelContext:
     hotel_id: str
     profile: HotelProfile
     policies: HotelPolicies
-    brand_voice: BrandVoice
+    reply_settings: ReplySettings

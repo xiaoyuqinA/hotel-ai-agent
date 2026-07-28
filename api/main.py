@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from api.routes import router as agent_router
 from api.sse import router as sse_router
+from api.hotel_config import router as hotel_config_router
 from shared.runtime.workflow_runtime import WorkflowRuntime
 
 # ── Global Runtime ──────────────────────────────────────────────────────────────
@@ -53,4 +54,5 @@ app = FastAPI(
 
 app.include_router(agent_router)
 app.include_router(sse_router)
+app.include_router(hotel_config_router)
 app.state.runtime = _runtime

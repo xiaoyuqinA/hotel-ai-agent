@@ -15,15 +15,32 @@ import asyncio
 import json
 from typing import Any, AsyncGenerator, AsyncIterator
 
+from datetime import datetime, timezone
+
 import redis.asyncio as redis
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, select, and_
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    DateTime,
+    JSON,
+    select,
+    and_,
+    update,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 
 from config.settings import get_postgres_url, get_redis_url
-from shared.workflow_events.models import WorkflowEvent, WorkflowStartedEvent, WorkflowCompletedEvent, WorkflowFailedEvent
+from shared.workflow_events.models import (
+    WorkflowEvent,
+    WorkflowStartedEvent,
+    WorkflowCompletedEvent,
+    WorkflowFailedEvent,
+)
 
 # ── SQLAlchemy Models ───────────────────────────────────────────────────────────
 
@@ -42,8 +59,11 @@ class WorkflowRunRecord(Base):
     input_data = Column(JSON)
     result = Column(JSON)
     error = Column(Text)
+    canceled = Column(String(1), default="0")  # "1" = 已取消
     created_at = Column(DateTime(timezone=True), server_default="now()")
-    updated_at = Column(DateTime(timezone=True), server_default="now()", onupdate="now()")
+    updated_at = Column(
+        DateTime(timezone=True), server_default="now()", onupdate="now()"
+    )
     completed_at = Column(DateTime(timezone=True))
 
 
@@ -115,6 +135,7 @@ async def close_db() -> None:
 
 # ── Event Repository ──────────────────────────────────────────────────────────
 
+
 async def save_event(event: WorkflowEvent) -> None:
     """持久化单个事件到 PostgreSQL。"""
     session_factory = _get_session_factory()
@@ -147,12 +168,16 @@ async def get_events_after(
     """
     session_factory = _get_session_factory()
     async with session_factory() as session:
-        stmt = select(WorkflowEventRecord).where(
-            and_(
-                WorkflowEventRecord.workflow_id == workflow_id,
-                WorkflowEventRecord.sequence > last_sequence,
+        stmt = (
+            select(WorkflowEventRecord)
+            .where(
+                and_(
+                    WorkflowEventRecord.workflow_id == workflow_id,
+                    WorkflowEventRecord.sequence > last_sequence,
+                )
             )
-        ).order_by(WorkflowEventRecord.sequence)
+            .order_by(WorkflowEventRecord.sequence)
+        )
 
         result = await session.execute(stmt)
         records = result.scalars().all()
@@ -177,6 +202,7 @@ async def get_all_events(workflow_id: str) -> list[WorkflowEvent]:
 
 
 # ── Run Repository ─────────────────────────────────────────────────────────────
+
 
 async def create_run_record(
     run_id: str,
@@ -207,7 +233,6 @@ async def update_run_status(
     """更新 workflow_runs 状态。"""
     session_factory = _get_session_factory()
     async with session_factory() as session:
-        from sqlalchemy import update
         stmt = (
             update(WorkflowRunRecord)
             .where(WorkflowRunRecord.id == run_id)
@@ -215,7 +240,10 @@ async def update_run_status(
                 status=status,
                 result=result,
                 error=error,
-                completed_at="now()" if status in ("completed", "failed") else None,
+                updated_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc)
+                if status in ("completed", "failed", "cancelled")
+                else None,
             )
         )
         await session.execute(stmt)
@@ -237,9 +265,55 @@ async def get_run_record(run_id: str) -> dict | None:
                 "thread_id": record.thread_id,
                 "result": record.result,
                 "error": record.error,
-                "created_at": record.created_at.isoformat() if record.created_at else None,
+                "canceled": record.canceled == "1",
+                "created_at": record.created_at.isoformat()
+                if record.created_at
+                else None,
             }
         return None
+
+
+async def cancel_workflow_run(run_id: str) -> bool:
+    """标记 workflow_runs 为已取消。
+
+    Args:
+        run_id: Workflow Run ID
+
+    Returns:
+        是否成功取消
+    """
+    session_factory = _get_session_factory()
+    async with session_factory() as session:
+        stmt = (
+            update(WorkflowRunRecord)
+            .where(WorkflowRunRecord.id == run_id)
+            .values(
+                canceled="1",
+                status="cancelled",
+                updated_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+            )
+        )
+        await session.execute(stmt)
+        await session.commit()
+    return True
+
+
+async def is_workflow_cancelled(run_id: str) -> bool:
+    """检查 workflow 是否已被取消。
+
+    Args:
+        run_id: Workflow Run ID
+
+    Returns:
+        是否已取消
+    """
+    session_factory = _get_session_factory()
+    async with session_factory() as session:
+        stmt = select(WorkflowRunRecord.canceled).where(WorkflowRunRecord.id == run_id)
+        result = await session.execute(stmt)
+        canceled = result.scalar_one_or_none()
+        return canceled == "1" if canceled is not None else False
 
 
 # ── Redis Pub/Sub ──────────────────────────────────────────────────────────────
@@ -306,6 +380,7 @@ async def subscribe_events(run_id: str) -> AsyncGenerator[WorkflowEvent, None]:
 
 
 # ── 组合服务 ──────────────────────────────────────────────────────────────────
+
 
 async def save_and_publish(event: WorkflowEvent) -> None:
     """持久化 + 发布（原子操作）。"""
