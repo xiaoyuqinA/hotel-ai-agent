@@ -1,34 +1,31 @@
 """Load Hotel Context Node — 加载酒店上下文到 state。"""
 
-from shared.context.hotel_context import (
-    HotelContext,
-    HotelPolicies,
-    HotelProfile,
-    ReplySettings,
-)
+from dataclasses import dataclass
+
+from shared.context.hotel_context import ReplySettings
 from shared.context.loader import HotelContextLoader
 
 from ..state import ReviewReplyState
 
 
-def _from_frontend(data: dict) -> HotelContext:
-    """将前端传来的 hotel_context dict 转为 HotelContext 对象。"""
+@dataclass(frozen=True)
+class FrontendHotelContext:
+    """从前端 hotel_context 字段直接构建的轻量 HotelContext。
+
+    只保留前端传入的字段：hotel_id、name、reply_settings。
+    不构造空的 profile 和 policies。
+    """
+    hotel_id: str
+    name: str
+    reply_settings: ReplySettings
+
+
+def _from_frontend(data: dict) -> FrontendHotelContext:
+    """将前端传来的 hotel_context dict 转为 FrontendHotelContext。"""
     rs = data.get("reply_settings", {})
-    return HotelContext(
+    return FrontendHotelContext(
         hotel_id=data.get("hotel_id", ""),
-        profile=HotelProfile(
-            hotel_id=data.get("hotel_id", ""),
-            name=data.get("name", ""),
-            positioning="",
-            address="",
-            service_philosophy="",
-        ),
-        policies=HotelPolicies(
-            breakfast="",
-            parking="",
-            check_in="",
-            check_out="",
-        ),
+        name=data.get("name", ""),
         reply_settings=ReplySettings(
             tone=rs.get("tone", ""),
             style=rs.get("style", ""),

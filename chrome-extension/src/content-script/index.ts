@@ -30,27 +30,21 @@ async function getAdapter(): Promise<OTAAdapter | null> {
 
 /**
  * 获取当前酒店配置（只读）
- * 通过 ConfigService 而非直接操作 chrome.storage
- * 扩展上下文失效时自动等待重连
+ * 通过 Service Worker 读取 chrome.storage，避免 Content Script
+ * 的 chrome.storage 在扩展刷新后抛 Extension context invalidated。
  */
 async function _getCurrentHotel() {
-  // 通过 PING 检查 runtime 是否真正可用
-  const valid = await _isRuntimeValid();
-  if (!valid) {
-    console.warn('[AssistantWidget] Runtime invalid (PING failed), waiting for reconnect...');
-    const ready = await _ensureRuntimeReady();
-    if (!ready) {
-      console.warn('[AssistantWidget] Runtime recovery failed, returning null');
-      return null;
-    }
-    // 重新初始化 adapter
-    getAdapter().then(a => a?.initialize?.());
-  }
-
   try {
-    return await configService.getCurrentHotel();
+    const resp = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_HOTEL' });
+    if (resp?.current_hotel) {
+      return resp.current_hotel;
+    }
+    if (resp?.error) {
+      console.warn('[AssistantWidget] GET_CURRENT_HOTEL error:', resp.error);
+    }
+    return null;
   } catch (e) {
-    console.warn('[AssistantWidget] Failed to get current hotel:', e, (e as Error)?.message);
+    console.warn('[AssistantWidget] Failed to get current hotel via SW:', e);
     return null;
   }
 }
@@ -61,7 +55,16 @@ async function _getCurrentHotel() {
 async function _getCurrentHotelConfig() {
   const current = await _getCurrentHotel();
   if (!current) return null;
-  return configService.getHotel(current.hotel_id);
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: 'GET_HOTEL_CONFIG',
+      payload: { hotel_id: current.hotel_id },
+    });
+    return resp?.hotel_config ?? null;
+  } catch (e) {
+    console.warn('[AssistantWidget] Failed to get hotel config via SW:', e);
+    return null;
+  }
 }
 
 // ── 初始化 ─────────────────────────────────────────────────────────────────
@@ -136,7 +139,7 @@ function handleMessage(message, sender, sendResponse) {
       break;
   }
 
-  sendResponse({ received: true });
+  try { sendResponse({ received: true }); } catch { /* context invalidated */ }
   return true;
 }
 
@@ -498,7 +501,7 @@ async function onGenerate() {
       return;
     }
 
-    chrome.runtime.sendMessage({
+    await chrome.runtime.sendMessage({
       type: 'GENERATE_REPLY',
       payload: {
         review,
@@ -508,6 +511,9 @@ async function onGenerate() {
           reply_settings: replySettings,
         } : null,
       },
+    }).catch((e) => {
+      console.error('[AssistantWidget] sendMessage rejected:', e);
+      throw e;
     });
   } catch (e) {
     console.error('[AssistantWidget] sendMessage failed:', e);

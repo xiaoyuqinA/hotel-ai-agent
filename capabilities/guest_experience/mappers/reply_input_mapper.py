@@ -1,31 +1,40 @@
 """ReplyInputMapper — 构建 Agent 输入 JSON。"""
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from capabilities.guest_experience.workflows.state import ReviewReplyState
 
 
+def _to_dict(obj):
+    """将任意对象转为 dict，兼容 dataclass / dict / None。"""
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "__dataclass_fields__"):
+        return {f: _to_dict(getattr(obj, f)) for f in obj.__dataclass_fields__}
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return str(obj)
+
+
 class ReplyInputMapper:
-    """构建 review_reply_agent 的输入 JSON。
+    """构建 review_reply_agent 的输入 JSON。"""
 
-    使用 model_dump()/asdict() 而非手动字段复制。
-    """
+    @staticmethod
+    def map(state: ReviewReplyState) -> str:
+        """将 state 映射为 Agent 输入 JSON。"""
+        analysis = state["anaylay_result"]
+        analysis_data = _to_dict(analysis)
 
-    def map(self, state: ReviewReplyState) -> str:
-        """将 state 映射为 Agent 输入 JSON。
+        hotel_context = state.get("hotel_context")
+        ctx = _to_dict(hotel_context) if hotel_context else None
 
-        Args:
-            state: 工作流状态
-
-        Returns:
-            JSON 字符串，包含 review、analysis 和 hotel_context
-        """
-        return json.dumps(
-            {
-                "original_comment": state["reviews_content"],
-                "analysis": state["anaylay_result"].model_dump(),
-                "hotel_context": asdict(state["hotel_context"]),
-            },
-            ensure_ascii=False,
-        )
+        result = {
+            "original_comment": state["reviews_content"],
+            "analysis": analysis_data,
+            "hotel_context": ctx,
+        }
+        print(f"[ReplyInputMapper] Full Agent input JSON:\n{json.dumps(result, ensure_ascii=False, default=str)}")
+        return json.dumps(result, ensure_ascii=False, default=str)

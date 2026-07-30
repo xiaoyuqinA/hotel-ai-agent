@@ -114,6 +114,9 @@ async def create_review_run(request: Request) -> dict:
     thread_id = body.get("thread_id", "")
     hotel_context = body.get("hotel_context")
 
+    import json as _json
+    print(f"[API] POST /review/run request: {_json.dumps(body, ensure_ascii=False, default=str)}")
+
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
 
@@ -148,11 +151,13 @@ async def create_review_run(request: Request) -> dict:
         )
     )
 
-    return {
+    response_data = {
         "run_id": run_id,
         "status": "pending",
         "thread_id": thread_id,
     }
+    print(f"[API] POST /review/run response: {_json.dumps(response_data, ensure_ascii=False, default=str)}")
+    return response_data
 
 
 router.add_api_route(

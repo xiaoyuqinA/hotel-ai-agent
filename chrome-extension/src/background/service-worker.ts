@@ -142,6 +142,12 @@ async function handleMessage(message, sender) {
     case 'PING':
       return { pong: true }
 
+    case 'GET_CURRENT_HOTEL':
+      return await handleGetCurrentHotel()
+
+    case 'GET_HOTEL_CONFIG':
+      return await handleGetHotelConfig(payload?.hotel_id)
+
     case 'GENERATE_REPLY':
       return await handleGenerateReply(payload, sender.tab?.id)
 
@@ -183,18 +189,23 @@ async function handleGenerateReply(payload, tabId) {
 
   try {
     // 1. 创建 workflow run（直接用 fetch，不用 client）
-    console.log('[ServiceWorker] Creating workflow run...')
+    const body = JSON.stringify({ reviews_content: review, hotel_context })
+    console.log('[ServiceWorker] POST /review/run request body:', body)
     const response = await fetch(`${apiUrl}/review/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviews_content: review, hotel_context }),
+      body,
     })
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => '')
+      console.error('[ServiceWorker] POST /review/run failed:', response.status, errBody)
       throw new Error(`Failed to create run: ${response.statusText}`)
     }
 
-    const { run_id, thread_id } = await response.json()
+    const result = await response.json()
+    console.log('[ServiceWorker] POST /review/run response:', JSON.stringify(result))
+    const { run_id, thread_id } = result
     console.log('[ServiceWorker] Workflow run created:', run_id, 'targetTabId:', targetTabId)
 
     // 2. 创建 Session
@@ -236,6 +247,33 @@ async function handleGenerateReply(payload, tabId) {
       throw new Error(data.detail || error.message)
     }
     throw error
+  }
+}
+
+/**
+ * 获取当前酒店（从 chrome.storage.local 读取，由 Service Worker 代理）
+ */
+async function handleGetCurrentHotel() {
+  try {
+    const result = await chrome.storage.local.get('current_hotel')
+    return { current_hotel: result['current_hotel'] || null }
+  } catch (error) {
+    return { error: error.message, current_hotel: null }
+  }
+}
+
+/**
+ * 获取酒店完整配置
+ */
+async function handleGetHotelConfig(hotelId) {
+  if (!hotelId) return { hotel_config: null }
+  try {
+    const result = await chrome.storage.local.get('hotel_configs')
+    const configs = result['hotel_configs'] || []
+    const hotel = configs.find(h => h.id === hotelId)
+    return { hotel_config: hotel || null }
+  } catch (error) {
+    return { error: error.message, hotel_config: null }
   }
 }
 
