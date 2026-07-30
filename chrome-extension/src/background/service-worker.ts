@@ -39,7 +39,7 @@ import { getEventRouter } from './event-router.js'
 // ── 配置 ─────────────────────────────────────────────────────────────────────
 
 /** 后端 API 地址（统一配置，由开发者维护） */
-const DEFAULT_API_URL = 'http://localhost:8000'
+const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // Service Worker 启动延迟重连的配置
 const RECONNECT_DELAY_BASE = 500  // 基础延迟（毫秒）
@@ -142,12 +142,6 @@ async function handleMessage(message, sender) {
     case 'PING':
       return { pong: true }
 
-    case 'GET_CURRENT_HOTEL':
-      return await handleGetCurrentHotel()
-
-    case 'GET_HOTEL_CONFIG':
-      return await handleGetHotelConfig(payload?.hotel_id)
-
     case 'GENERATE_REPLY':
       return await handleGenerateReply(payload, sender.tab?.id)
 
@@ -175,7 +169,28 @@ async function handleMessage(message, sender) {
  * 生成回复
  */
 async function handleGenerateReply(payload, tabId) {
-  const { review, threadId, hotel_context } = payload
+  const { review, threadId } = payload
+
+  // Service Worker 自己从 chrome.storage.local 读取 hotel 配置
+  let hotel_context = null
+  try {
+    const storageResult = await chrome.storage.local.get(['current_hotel', 'hotel_configs'])
+    const current = storageResult['current_hotel']
+    const configs = storageResult['hotel_configs'] || []
+    if (current) {
+      const hotel = configs.find(h => h.id === current.hotel_id)
+      if (hotel) {
+        hotel_context = {
+          hotel_id: hotel.id,
+          name: hotel.name,
+          reply_settings: hotel.reply_settings,
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[ServiceWorker] Failed to read hotel config from storage:', (e as Error)?.message, e)
+  }
+
   const targetTabId = tabId || activeTabId
 
   if (!targetTabId) {
@@ -251,33 +266,6 @@ async function handleGenerateReply(payload, tabId) {
 }
 
 /**
- * 获取当前酒店（从 chrome.storage.local 读取，由 Service Worker 代理）
- */
-async function handleGetCurrentHotel() {
-  try {
-    const result = await chrome.storage.local.get('current_hotel')
-    return { current_hotel: result['current_hotel'] || null }
-  } catch (error) {
-    return { error: error.message, current_hotel: null }
-  }
-}
-
-/**
- * 获取酒店完整配置
- */
-async function handleGetHotelConfig(hotelId) {
-  if (!hotelId) return { hotel_config: null }
-  try {
-    const result = await chrome.storage.local.get('hotel_configs')
-    const configs = result['hotel_configs'] || []
-    const hotel = configs.find(h => h.id === hotelId)
-    return { hotel_config: hotel || null }
-  } catch (error) {
-    return { error: error.message, hotel_config: null }
-  }
-}
-
-/**
  * 获取状态
  */
 async function handleGetStatus() {
@@ -346,16 +334,18 @@ async function handleCancel() {
   return { success: true }
 }
 
-/**
- * 设置 API URL
- */
 // ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
 /**
- * 获取 API URL（统一配置，无需用户设置）
+ * 获取 API URL（优先从 storage 读取用户配置，失败时使用默认值）
  */
 async function getApiUrl() {
-  return DEFAULT_API_URL
+  try {
+    const result = await chrome.storage.local.get('api_url')
+    return result['api_url'] || DEFAULT_API_URL
+  } catch {
+    return DEFAULT_API_URL
+  }
 }
 
 /**

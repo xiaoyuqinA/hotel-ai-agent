@@ -4,7 +4,8 @@
   "description": "智能生成酒店评论回复的 Chrome 扩展。",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode development",
+    "build:prod": "vite build --mode production",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

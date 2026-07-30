@@ -15,11 +15,19 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const extensionPath = path.resolve(__dirname, '../../dist')
-const userDataDir = path.resolve(__dirname, '../../.test-chrome-profile-local-config')
+const BASE_DATA_DIR = path.resolve(__dirname, '../../.test-chrome-profile-local-config')
+
+let testIdx = 0
 
 /** 从 service worker URL 获取扩展 ID */
 async function getExtensionId(context: BrowserContext): Promise<string> {
-  const worker = await context.waitForEvent('serviceworker', { timeout: 10000 })
+  // 先检查已有的 workers
+  const existing = context.serviceWorkers()
+  if (existing.length > 0) {
+    return new URL(existing[0].url()).hostname
+  }
+  // 再等待新 worker 注册
+  const worker = await context.waitForEvent('serviceworker', { timeout: 15000 })
   return new URL(worker.url()).hostname
 }
 
@@ -40,8 +48,15 @@ function evalStorage(context: BrowserContext, script: string) {
   }, script)
 }
 
-/** 创建浏览器上下文 */
+/** 创建浏览器上下文（每个测试用独立目录避免数据残留） */
 async function createContext() {
+  const fs = await import('fs')
+  testIdx++
+  const userDataDir = `${BASE_DATA_DIR}/test-${testIdx}`
+  if (fs.existsSync(userDataDir)) {
+    fs.rmSync(userDataDir, { recursive: true, force: true })
+  }
+
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless: false,
     args: [
@@ -57,15 +72,15 @@ async function createContext() {
 test.describe('Local Hotel Config E2E', () => {
   test.beforeAll(async () => {
     const fs = await import('fs')
-    if (fs.existsSync(userDataDir)) {
-      fs.rmSync(userDataDir, { recursive: true, force: true })
+    if (fs.existsSync(BASE_DATA_DIR)) {
+      fs.rmSync(BASE_DATA_DIR, { recursive: true, force: true })
     }
   })
 
   test.afterAll(async () => {
     const fs = await import('fs')
-    if (fs.existsSync(userDataDir)) {
-      fs.rmSync(userDataDir, { recursive: true, force: true })
+    if (fs.existsSync(BASE_DATA_DIR)) {
+      fs.rmSync(BASE_DATA_DIR, { recursive: true, force: true })
     }
   })
 
@@ -401,6 +416,14 @@ test.describe('Local Hotel Config E2E', () => {
       const page = await context.newPage()
       await page.goto(popupUrl)
       await page.waitForLoadState('domcontentloaded')
+      // 创建第一个酒店（可能在首页或创建表单，取决于 storage）
+      // 如果首页可见，先调到创建表单
+      const selectorBtn = page.locator('#hotel-selector-btn')
+      if (await selectorBtn.isVisible().catch(() => false)) {
+        await page.click('#hotel-selector-btn')
+        await expect(page.locator('#hotel-list-modal')).not.toHaveClass(/hidden/)
+        await page.click('#modal-new-hotel-btn')
+      }
       await expect(page.locator('#create-hotel-btn')).toBeVisible({ timeout: 5000 })
 
       // Step 1: 创建第一个酒店
