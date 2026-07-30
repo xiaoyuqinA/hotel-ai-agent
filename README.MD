@@ -144,3 +144,58 @@ python -m launcher.main --list-workflows
 # 运行 workflow
 python -m launcher.main --workflow review_operation --input "房间卫生很差"
 ```
+## Docker 部署
+
+### 前提条件
+
+- Docker & Docker Compose
+- `.env` 文件（项目根目录），包含 LLM API Key 等配置
+
+### 一键启动
+
+```bash
+# 构建后端镜像
+docker compose build
+
+# 启动所有服务（PostgreSQL + Redis + API）
+docker compose up -d
+
+# 查看日志
+docker compose logs -f api
+```
+
+启动后 API 运行在 `http://localhost:8000`。
+
+### 服务说明
+
+| 服务名 | 镜像 | 端口 | 数据挂载 |
+|--------|------|------|---------|
+| `api` | hotel-ai-backend:latest | 8000 | `./storage/`（SQLite checkpoints） |
+| `postgres` | postgres:16-alpine | 5432 | `./storage/postgres_data/` |
+| `redis` | redis:7-alpine | 6379 | `./storage/redis_data/` |
+
+### 单独构建镜像
+
+```bash
+docker build -t hotel-ai-backend:latest .
+```
+
+### 环境变量
+
+后端通过 `.env` 文件加载配置，关键变量：
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `OPENAI_API_KEY` | LLM API Key | — |
+| `OPENAI_BASE_URL` | LLM API 地址 | — |
+| `OPENAI_MODEL` | 模型名称 | — |
+
+PostgreSQL 和 Redis 连接地址由 Docker Compose 自动注入，无需手动配置。
+
+### 停止
+
+```bash
+docker compose down
+# 删除数据卷
+docker compose down -v
+```
