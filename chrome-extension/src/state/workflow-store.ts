@@ -10,18 +10,44 @@
 export type WorkflowStatus = 'idle' | 'running' | 'completed' | 'failed';
 
 export interface WorkflowEvent {
-  kind: string;
+  // 基类（与后端 WorkflowEvent 对齐）
+  id?: string;
+  workflow_id?: string;
   sequence?: number;
   category?: string;
-  payload: Record<string, unknown>;
-  workflow_id?: string;
+  kind: string;
+  display_name?: string | null;
+  timestamp?: number;
+  source?: string | null;
+
+  // TokenDeltaEvent
+  delta?: string;
+
+  // NodeStartedEvent / NodeCompletedEvent
+  node_name?: string;
+
+  // NodeFailedEvent / WorkflowFailedEvent
+  error?: string;
+
+  // StateUpdatedEvent
+  state?: Record<string, unknown>;
+
+  // WorkflowCompletedEvent
+  result?: Record<string, unknown> | null;
+
+  // CustomEvent
+  event_type?: string;
+  data?: Record<string, unknown>;
+
+  // ToolCallEvent
+  tool_name?: string;
+  tool_input?: Record<string, unknown>;
 }
 
 export interface WorkflowStateSnapshot {
   runId: string | null;
   status: WorkflowStatus;
   replyContent: string;
-  reviewContent: string;
   hotelId: string | null;
   error: string | null;
   lastSequence: number;
@@ -55,7 +81,6 @@ interface InternalState {
   runId: string | null;
   status: WorkflowStatus;
   replyContent: string;
-  reviewContent: string;
   hotelId: string | null;
   error: string | null;
   lastSequence: number;
@@ -67,7 +92,6 @@ let _state: InternalState = {
   runId: null,
   status: State.IDLE,
   replyContent: '',
-  reviewContent: '',
   hotelId: null,
   error: null,
   lastSequence: 0,
@@ -81,7 +105,6 @@ function notifyUpdate(): void {
       runId: _state.runId,
       status: _state.status,
       replyContent: _state.replyContent,
-      reviewContent: _state.reviewContent,
       hotelId: _state.hotelId,
       error: _state.error,
       lastSequence: _state.lastSequence,
@@ -95,14 +118,13 @@ export interface WorkflowStore {
   getState(): WorkflowStateSnapshot;
   getReply(): string;
   setReply(content: string): void;
-  getReview(): string;
   getStatus(): WorkflowStatus;
   getRunId(): string | null;
   getError(): string | null;
   isRunning(): boolean;
   setUpdateCallback(cb: UpdateCallback): void;
   reset(): void;
-  startRun(runId: string | null, reviewContent?: string, hotelId?: string): void;
+  startRun(runId: string | null, hotelId?: string): void;
   handleEvent(event: WorkflowEvent): void;
   setError(error: string): void;
 }
@@ -113,7 +135,6 @@ export function createStore(): WorkflowStore {
       runId: _state.runId,
       status: _state.status,
       replyContent: _state.replyContent,
-      reviewContent: _state.reviewContent,
       hotelId: _state.hotelId,
       error: _state.error,
       lastSequence: _state.lastSequence,
@@ -126,8 +147,6 @@ export function createStore(): WorkflowStore {
       _state.replyContent = content;
       notifyUpdate();
     },
-
-    getReview: () => _state.reviewContent,
 
     getStatus: () => _state.status,
 
@@ -145,7 +164,6 @@ export function createStore(): WorkflowStore {
       _state.runId = null;
       _state.status = State.IDLE;
       _state.replyContent = '';
-      _state.reviewContent = '';
       _state.hotelId = null;
       _state.error = null;
       _state.lastSequence = 0;
@@ -153,11 +171,10 @@ export function createStore(): WorkflowStore {
       notifyUpdate();
     },
 
-    startRun: (runId: string | null, reviewContent?: string, hotelId?: string) => {
+    startRun: (runId: string | null, hotelId?: string) => {
       _state.runId = runId;
       _state.status = State.RUNNING;
       _state.replyContent = '';
-      if (reviewContent !== undefined) _state.reviewContent = reviewContent;
       if (hotelId !== undefined) _state.hotelId = hotelId;
       _state.error = null;
       _state.events = [];
@@ -169,21 +186,17 @@ export function createStore(): WorkflowStore {
       _state.lastSequence = event.sequence || 0;
 
       if (event.kind === EventKind.TOKEN_DELTA) {
-        _state.replyContent += (event.payload.delta as string) || '';
+        _state.replyContent += (event.delta as string) || '';
       }
 
       switch (event.kind) {
         case EventKind.WORKFLOW_COMPLETED: {
           _state.status = State.COMPLETED;
-          const result = event.payload.result as Record<string, unknown> | undefined;
-          if (result?.reply_content) {
-            _state.replyContent = result.reply_content as string;
-          }
           break;
         }
         case EventKind.WORKFLOW_FAILED:
           _state.status = State.FAILED;
-          _state.error = (event.payload.error as string) || 'Unknown error';
+          _state.error = (event.error as string) || 'Unknown error';
           break;
       }
 

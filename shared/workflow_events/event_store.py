@@ -40,6 +40,7 @@ from shared.workflow_events.models import (
     WorkflowStartedEvent,
     WorkflowCompletedEvent,
     WorkflowFailedEvent,
+    parse_workflow_event,
 )
 
 # ── SQLAlchemy Models ───────────────────────────────────────────────────────────
@@ -147,7 +148,7 @@ async def save_event(event: WorkflowEvent) -> None:
             category=event.category,
             kind=event.kind,
             source=event.source,
-            payload=event.payload,
+            payload=event.model_dump(mode="json", exclude_none=True),
         )
         session.add(record)
         await session.commit()
@@ -182,23 +183,22 @@ async def get_events_after(
         result = await session.execute(stmt)
         records = result.scalars().all()
 
-        return [
-            WorkflowEvent(
-                id=r.id,
-                workflow_id=r.workflow_id,
-                sequence=r.sequence,
-                category=r.category,
-                kind=r.kind,
-                source=r.source,
-                payload=r.payload or {},
+        events: list[WorkflowEvent] = []
+        for r in records:
+            payload = dict(r.payload or {})
+            # 表字段优先，保证与索引列一致
+            payload.update(
+                {
+                    "id": r.id,
+                    "workflow_id": r.workflow_id,
+                    "sequence": r.sequence,
+                    "category": r.category,
+                    "kind": r.kind,
+                    "source": r.source,
+                }
             )
-            for r in records
-        ]
-
-
-async def get_all_events(workflow_id: str) -> list[WorkflowEvent]:
-    """获取工作流的所有事件。"""
-    return await get_events_after(workflow_id, 0)
+            events.append(parse_workflow_event(payload))
+        return events
 
 
 # ── Run Repository ─────────────────────────────────────────────────────────────
@@ -356,6 +356,8 @@ async def publish_event(event: WorkflowEvent) -> None:
 async def subscribe_events(run_id: str) -> AsyncGenerator[WorkflowEvent, None]:
     """订阅 Redis 频道获取实时事件。
 
+    收到 __CLOSE__ 信号后自然退出 generator。
+
     Args:
         run_id: Workflow Run ID
 
@@ -371,12 +373,22 @@ async def subscribe_events(run_id: str) -> AsyncGenerator[WorkflowEvent, None]:
         async for message in pubsub.listen():
             if message["type"] == "message":
                 data = message["data"]
-                if isinstance(data, str):
-                    event = WorkflowEvent.model_validate_json(data)
-                    yield event
+                if isinstance(data, (str, bytes)):
+                    if isinstance(data, bytes):
+                        data = data.decode("utf-8")
+                    if data == "__CLOSE__":
+                        return
+                    yield parse_workflow_event(data)
     finally:
         await pubsub.unsubscribe(channel)
         await pubsub.close()
+
+
+async def close_channel(run_id: str) -> None:
+    """发布关闭信号，让订阅端自然退出。"""
+    r = await _get_redis()
+    channel = _channel_name(run_id)
+    await r.publish(channel, "__CLOSE__")
 
 
 # ── 组合服务 ──────────────────────────────────────────────────────────────────
@@ -395,7 +407,8 @@ async def subscribe_with_history(
     """订阅事件流，包含历史事件。
 
     1. 先发送 last_sequence 之后的历史事件
-    2. 然后订阅 Redis 实时事件
+    2. 检查 run 状态，已完成则不订阅 Redis
+    3. 订阅 Redis 实时事件（收到 __CLOSE__ 后自然退出）
 
     Args:
         run_id: Workflow Run ID
@@ -409,7 +422,11 @@ async def subscribe_with_history(
     for event in historical:
         yield event
 
-    # 2. 订阅实时事件
+    # 2. 检查 run 是否已完成，已完成则不订阅 Redis
+    run = await get_run_record(run_id)
+    if run and run["status"] in ("completed", "failed", "cancelled"):
+        return
+
+    # 3. 订阅实时事件（收到 __CLOSE__ 后自然退出）
     async for event in subscribe_events(run_id):
-        if event.sequence > last_sequence:
-            yield event
+        yield event

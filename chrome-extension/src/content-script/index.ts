@@ -18,8 +18,9 @@ const store = createStore();
 const CURRENT_HOTEL_KEY = 'current_hotel';
 
 let _adapter: OTAAdapter | null = null;
-function getAdapter() {
-  if (!_adapter) _adapter = detectAdapter();
+let _currentReview = '';
+async function getAdapter(): Promise<OTAAdapter | null> {
+  if (!_adapter) _adapter = await detectAdapter();
   return _adapter;
 }
 
@@ -36,6 +37,7 @@ function init() {
   chrome.runtime.onMessage.addListener(handleMessage);
   injectStyles();
   injectFAB();
+  getAdapter().then(a => a?.initialize?.());
 
   console.log('[AssistantWidget] initialized');
 }
@@ -69,8 +71,8 @@ function handleMessage(message, sender, sendResponse) {
   return true;
 }
 
-function handleWorkflowStarted(payload) {
-  showPanel();
+async function handleWorkflowStarted(payload) {
+  await showPanel();
   setPanelView('running');
 }
 
@@ -79,14 +81,14 @@ function handleStatusUpdate(payload) {
 }
 
 function handleTokenDelta(payload) {
-  store.handleEvent({ kind: 'token_delta', payload: { delta: payload.delta }, category: 'message' });
+  store.handleEvent({ kind: 'token_delta', delta: payload.delta, category: 'message' });
   updateReplyContent(store.getReply());
 }
 
 function handleWorkflowCompleted(payload) {
-  store.handleEvent({ kind: 'workflow_completed', payload: { result: payload.result }, category: 'system' });
-  updateStatus('completed', '回复生成完成');
-  updateReplyContent(payload.replyContent || store.getReply());
+  store.handleEvent({ kind: 'workflow_completed', result: payload.result, category: 'system' });
+  updateStatus('completed', payload.status || '回复生成完成');
+  // replyContent 已由 token_delta 流式累积，不再覆盖
   setPanelView('completed');
 }
 
@@ -144,14 +146,11 @@ async function showPanel() {
 
   panel.classList.remove('hidden');
 
-  const hotel = await _getCurrentHotel();
-  if (!hotel) {
-    setPanelView('no-hotel');
-    return;
-  }
+  await _getCurrentHotel(); // 确保 hotel 加载完成（酒店为可选）
 
-  const currentView = panel.dataset.view;
-  if (!currentView || currentView === 'idle' || currentView === 'no-hotel') {
+  // 首次展示：初始化为 idle；非首次：保持当前视图（completed/failed 等）
+  if (!panel.dataset.view) {
+    store.reset();
     setPanelView('idle');
   }
 
@@ -166,6 +165,7 @@ function hidePanel() {
 function dismissPanel() {
   hidePanel();
   store.reset();
+  if (panel) delete panel.dataset.view;
 }
 
 // ── Panel Views ────────────────────────────────────────────────────────────
@@ -214,22 +214,53 @@ function renderNoHotel() {
 
 async function renderIdle() {
   const hotel = await _getCurrentHotel();
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   const ctx = adapter ? await adapter.getReview() : null;
-  const review = store.getReview() || ctx?.content || '';
-
+  const review = ctx?.content || '';
+  console.log('[AssistantWidget] renderIdle → review from adapter:', review, '(ctx:', ctx, ')');
+  
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
-      <div class="ha-hotel-badge">🏨 ${hotel ? hotel.hotel_name : '未选择'}</div>
+      <div class="ha-hotel-badge">
+        ${hotel ? `🏨 ${hotel.hotel_name}` : `✨ 默认回复模式`}
+      </div>
+      ${!hotel ? `<div class="ha-tip">配置酒店后可自定义回复语气</div>` : ''}
       <div class="ha-review-box" id="ha-review-text">
         ${review || '<span class="ha-placeholder">选中评论后，点击「生成回复」</span>'}
       </div>
-      ${review ? `<button class="ha-btn ha-btn-primary" id="ha-generate-btn">生成回复</button>`
-               : `<button class="ha-btn ha-btn-primary" id="ha-generate-btn">选择评论并生成</button>`}
+      <button class="ha-btn ha-btn-primary" id="ha-generate-btn">AI生成回复</button>
     </div>
   `;
   bindHeaderEvents();
   document.getElementById('ha-generate-btn').addEventListener('click', onGenerate);
+
+  _setupSelectionWatcher();
+}
+
+let _selectionWatcher: (() => void) | null = null;
+
+function _setupSelectionWatcher() {
+  _selectionWatcher?.();
+  const handler = () => {
+    const sel = window.getSelection()?.toString().trim() ?? '';
+    if (sel) {
+      const reviewBox = document.getElementById('ha-review-text');
+      if (reviewBox) {
+        reviewBox.textContent = sel;
+        reviewBox.classList.remove('ha-placeholder');
+      }
+    }
+  };
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const debounced = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(handler, 150);
+  };
+  document.addEventListener('selectionchange', debounced);
+  _selectionWatcher = () => {
+    document.removeEventListener('selectionchange', debounced);
+    if (timer) clearTimeout(timer);
+  };
 }
 
 function renderRunning() {
@@ -249,7 +280,7 @@ function renderRunning() {
 
 function renderCompleted() {
   const reply = store.getReply() || '';
-  const review = store.getReview();
+  const review = _currentReview;
 
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
@@ -363,14 +394,10 @@ function bindHeaderEvents() {
 // ── 核心业务 ─────────────────────────────────────────────────────────────────
 
 async function onGenerate() {
-  // P0 修复：无酒店时不 fallback，直接提示
   const hotel = await _getCurrentHotel();
-  if (!hotel) {
-    setPanelView('no-hotel');
-    return;
-  }
+  const hotelId = hotel?.hotel_id ?? null;
 
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   if (!adapter) {
     updateStatus('error', '当前页面不支持');
     setPanelView('idle');
@@ -385,14 +412,14 @@ async function onGenerate() {
     return;
   }
 
-  // 保存到 store，关联原始评论和酒店
-  store.startRun(null, review, hotel.hotel_id);
+  _currentReview = review;
+  store.startRun(null, hotelId);
   setPanelView('running');
   setFABState('generating');
 
   chrome.runtime.sendMessage({
     type: 'GENERATE_REPLY',
-    payload: { review, hotel_id: hotel.hotel_id },
+    payload: { review, hotel_id: hotelId },
   });
 }
 
@@ -402,7 +429,7 @@ async function onPublish() {
 
   setPanelView('publishing');
 
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   if (!adapter) {
     store.setError('无可用 Adapter');
     setPanelView('error');
@@ -556,6 +583,7 @@ function getStyles() {
     .ha-edit-textarea:focus { border-color: #667eea; }
 
     .ha-empty { text-align: center; padding: 30px 0; color: #999; font-size: 14px; }
+    .ha-tip { font-size: 12px; color: #999; margin-bottom: 10px; padding: 6px 8px; background: #f9f9f9; border-radius: 6px; }
   `;
 }
 

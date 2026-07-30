@@ -27,8 +27,10 @@ from shared.workflow_events.event_store import (
     save_and_publish,
     subscribe_with_history,
     cancel_workflow_run,
+    close_channel,
 )
 from shared.streaming.runner import WorkflowRunner
+from shared.workflow_events.display_names import DisplayName
 
 router = APIRouter(prefix="/review", tags=["review"])
 
@@ -53,31 +55,48 @@ async def _run_workflow_background(
 
         await update_run_status(run_id, "running")
 
-        started_event = WorkflowStartedEvent.create(run_id)
+        started_event = WorkflowStartedEvent.create(
+            run_id,
+            display_name=DisplayName.WORKFLOW_STARTED,
+        )
+        started_event.sequence = 1
         await save_and_publish(started_event)
 
         runner = WorkflowRunner(workflow_id=run_id)
 
         result = None
-        terminal_published = False
         async for event in runner.run(workflow.graph, input_data, config):
             await save_and_publish(event)
-            if event.kind in ("workflow_completed", "workflow_failed"):
-                terminal_published = True
-                result = event.payload.get("result")
+            if isinstance(event, WorkflowCompletedEvent):
+                result = event.result
+            elif isinstance(event, WorkflowFailedEvent):
+                result = {"error": event.error}
 
-        if not terminal_published and runner.is_cancelled:
-            await save_and_publish(WorkflowCancelledEvent.create(run_id))
+        if runner.is_cancelled:
+            await save_and_publish(
+                WorkflowCancelledEvent.create(
+                    run_id, display_name=DisplayName.WORKFLOW_CANCELLED
+                )
+            )
             await update_run_status(run_id, "cancelled")
         else:
             await update_run_status(run_id, "completed", result=result)
 
     except Exception as e:
-        await save_and_publish(WorkflowFailedEvent.create(run_id, str(e)))
+        try:
+            await save_and_publish(
+                WorkflowFailedEvent.create(
+                    run_id, str(e), display_name=DisplayName.WORKFLOW_FAILED
+                )
+            )
+        except Exception:
+            pass
         try:
             await update_run_status(run_id, "failed", error=str(e))
         except Exception:
             pass
+    finally:
+        await close_channel(run_id)
 
 
 async def create_review_run(request: Request) -> dict:
@@ -165,17 +184,8 @@ async def stream_review_run(request: Request, run_id: str) -> Response:
     last_sequence = int(request.query_params.get("last_sequence", 0))
 
     async def event_generator():
-        # 订阅事件流（包含历史事件 + 实时事件）
         async for event in subscribe_with_history(run_id, last_sequence):
             yield format_sse_event(event)
-
-            # workflow_completed / workflow_failed / workflow_cancelled 后退出
-            if event.kind in (
-                "workflow_completed",
-                "workflow_failed",
-                "workflow_cancelled",
-            ):
-                break
 
     return StreamingResponse(
         event_generator(),

@@ -20,9 +20,9 @@ def _build_graph() -> StateGraph:
     workflow.add_node("analysis", analysis_node)
     workflow.add_node("strategy", strategy_node)
     workflow.add_node("generate_reply", generate_reply_node)
-    workflow.add_node("human_review", human_review_node)
-    workflow.add_node("human_process", human_process_node)
-    workflow.add_node("publish", publish_node)
+    # workflow.add_node("human_review", human_review_node)
+    # workflow.add_node("human_process", human_process_node)
+    # workflow.add_node("publish", publish_node)
 
     # 入口
     workflow.set_entry_point("load_hotel_context")
@@ -30,27 +30,33 @@ def _build_graph() -> StateGraph:
     # load_hotel_context -> analysis
     workflow.add_edge("load_hotel_context", "analysis")
 
-    # analysis -> strategy
-    workflow.add_edge("analysis", "strategy")
+    workflow.add_edge("generate_reply", END)
 
-    # 条件路由：strategy -> low / medium / high
-    workflow.add_conditional_edges(
-        "strategy",
-        strategy_router,
-        {"low": "generate_reply", "medium": "generate_reply", "high": "human_process"},
-    )
+    # analysis -> generate_reply
+    workflow.add_edge("analysis", "generate_reply")
+
+    # 条件路由：strategy -> auto_reply / ai_reply_review / human_review
+    # workflow.add_conditional_edges(
+    #    "strategy",
+    #    strategy_router,
+    #    {
+    #        "auto_reply": "generate_reply",
+    #        "ai_reply_review": "generate_reply",
+    #        "human_review": "human_process",
+    #    },
+    # )
 
     # generate_reply -> reply_router -> publish / human_review
-    workflow.add_conditional_edges(
-        "generate_reply",
-        reply_router,
-        {"low": "publish", "medium": "human_review"},
-    )
+    # workflow.add_conditional_edges(
+    #    "generate_reply",
+    #    reply_router,
+    #    {"auto_reply": "publish", "ai_reply_review": "human_review"},
+    # )
 
     # 各分支汇聚到 publish
-    workflow.add_edge("human_review", "publish")
-    workflow.add_edge("human_process", "publish")
-    workflow.add_edge("publish", END)
+    # workflow.add_edge("human_review", "publish")
+    # workflow.add_edge("human_process", "publish")
+    # workflow.add_edge("publish", END)
 
     return workflow
 

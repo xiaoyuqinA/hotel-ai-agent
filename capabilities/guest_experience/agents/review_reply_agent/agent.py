@@ -9,7 +9,6 @@ from agents import Agent
 from shared.llm.factory import create_agent_model
 from shared.prompts.loader import load_prompt_from_agent_dir
 from shared.registry.agent_registry import register_agent
-from .schemas import ReplyResult
 from .tools import get_reply_tools
 
 
@@ -27,11 +26,11 @@ def create_agent() -> Agent:
     instructions = load_prompt_from_agent_dir(Path(__file__).resolve().parent)
 
     return Agent(
-        name=os.environ.get("AGENT_NAME", config.get("name", "review_reply_agent")) or "review_reply_agent",
+        name=os.environ.get("AGENT_NAME", config.get("name", "review_reply_agent"))
+        or "review_reply_agent",
         instructions=instructions,
         model=model,
         tools=get_reply_tools(),
-        output_type=ReplyResult,
     )
 
 
@@ -39,5 +38,7 @@ def create_agent() -> Agent:
 register_agent(
     "review_reply_agent",
     create_agent,
-    metadata={"welcome_message": load_config().get("ui", {}).get("welcome_message", "")},
+    metadata={
+        "welcome_message": load_config().get("ui", {}).get("welcome_message", "")
+    },
 )

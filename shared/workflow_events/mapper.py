@@ -28,6 +28,7 @@ from shared.workflow_events.models import (
     CustomEvent,
 )
 from shared.workflow_events.kinds import BusinessEvent
+from shared.workflow_events.display_names import DisplayName
 
 import uuid
 
@@ -146,15 +147,15 @@ class ProjectionMapper:
         Returns:
             转换后的 WorkflowEvent
         """
-        event_type = data.get("event", "")
+        event_type = data.get("kind", "")
         message = data.get("message", "")
 
-        # ── Analysis 阶段 ──────────────────────────────────────────────
+        # ── Analysis 阶段 ──────────────────────────────────────────
         if event_type == BusinessEvent.ANALYSIS_STARTED:
             return NodeStartedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="analysis",
-                display_name="分析评论中",
+                display_name=DisplayName.ANALYSIS_STARTED,
                 sequence=sequence,
             )
 
@@ -162,6 +163,7 @@ class ProjectionMapper:
             return NodeCompletedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="analysis",
+                display_name=DisplayName.ANALYSIS_COMPLETED,
                 sequence=sequence,
             )
 
@@ -171,15 +173,16 @@ class ProjectionMapper:
                 workflow_id=self.workflow_id,
                 node_name="analysis",
                 error=error,
+                display_name=DisplayName.ANALYSIS_FAILED,
                 sequence=sequence,
             )
 
-        # ── Generation 阶段 ─────────────────────────────────────────────
+        # ── Generation 阶段 ───────────────────────────────────────
         if event_type == BusinessEvent.GENERATION_STARTED:
             return NodeStartedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="generation",
-                display_name="回复生成中",
+                display_name=DisplayName.GENERATION_STARTED,
                 sequence=sequence,
             )
 
@@ -187,6 +190,7 @@ class ProjectionMapper:
             return NodeCompletedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="generation",
+                display_name=DisplayName.GENERATION_COMPLETED,
                 sequence=sequence,
             )
 
@@ -196,15 +200,16 @@ class ProjectionMapper:
                 workflow_id=self.workflow_id,
                 node_name="generation",
                 error=error,
+                display_name=DisplayName.GENERATION_FAILED,
                 sequence=sequence,
             )
 
-        # ── Review 阶段 ─────────────────────────────────────────────────
+        # ── Review 阶段 ───────────────────────────────────────────
         if event_type == BusinessEvent.REVIEW_STARTED:
             return NodeStartedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="review",
-                display_name="审核回复中",
+                display_name=DisplayName.REVIEW_STARTED,
                 sequence=sequence,
             )
 
@@ -212,6 +217,7 @@ class ProjectionMapper:
             return NodeCompletedEvent.create(
                 workflow_id=self.workflow_id,
                 node_name="review",
+                display_name=DisplayName.REVIEW_COMPLETED,
                 sequence=sequence,
             )
 
@@ -221,6 +227,7 @@ class ProjectionMapper:
                 workflow_id=self.workflow_id,
                 node_name="review",
                 error=error,
+                display_name=DisplayName.REVIEW_FAILED,
                 sequence=sequence,
             )
 
@@ -235,6 +242,38 @@ class ProjectionMapper:
                 )
                 event.sequence = sequence
                 return event
+
+        # ── Node 事件（由 NodeEventEmitter 发送）─────────────────────
+        if event_type == "node_started":
+            event = NodeStartedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name=data.get("node_name", ""),
+                display_name=data.get("display_name"),
+                sequence=sequence,
+            )
+            event.source = data.get("source")
+            return event
+
+        if event_type == "node_completed":
+            event = NodeCompletedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name=data.get("node_name", ""),
+                display_name=data.get("display_name"),
+                sequence=sequence,
+            )
+            event.source = data.get("source")
+            return event
+
+        if event_type == "node_failed":
+            event = NodeFailedEvent.create(
+                workflow_id=self.workflow_id,
+                node_name=data.get("node_name", ""),
+                error=data.get("error", "unknown"),
+                display_name=data.get("display_name"),
+                sequence=sequence,
+            )
+            event.source = data.get("source")
+            return event
 
         # ── 其他 custom 事件（透传）──────────────────────────────────────
         if event_type:
@@ -264,24 +303,36 @@ class ProjectionMapper:
         Yields:
             WorkflowEvent 序列
         """
-        # workflow_started 由上游负责发布（sse.py 中 _run_workflow_background 统一管理）
+        max_sequence = 0
         try:
-            # astream_events 是 coroutine，需要先 await 获取 async iterator
             stream = await graph.astream_events(
                 input,
                 config=config,
                 version="v3",
             )
-            final_state: dict[str, Any] = {}
+            final_state: dict[str, Any] | None = None
             async for raw_event in stream:
                 event = self.transform(raw_event)
                 if event:
+                    if event.sequence > max_sequence:
+                        max_sequence = event.sequence
+                    if isinstance(event, StateUpdatedEvent):
+                        final_state = event.state
                     yield event
-                # 记录最后一个 values 事件的 state（包含节点返回的完整结果）
-                if raw_event.get("method") == "values":
-                    final_state = raw_event.get("params", {}).get("data", {})
 
-            yield WorkflowCompletedEvent.create(self.workflow_id, final_state or None)
+            completed_event = WorkflowCompletedEvent.create(
+                self.workflow_id,
+                final_state,
+                display_name=DisplayName.WORKFLOW_COMPLETED,
+            )
+            completed_event.sequence = max_sequence + 1
+            yield completed_event
 
         except Exception as e:
-            yield WorkflowFailedEvent.create(self.workflow_id, str(e))
+            failed_event = WorkflowFailedEvent.create(
+                self.workflow_id,
+                str(e),
+                display_name=DisplayName.WORKFLOW_FAILED,
+            )
+            failed_event.sequence = max_sequence + 1
+            yield failed_event

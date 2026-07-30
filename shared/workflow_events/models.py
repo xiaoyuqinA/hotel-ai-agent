@@ -1,32 +1,41 @@
-"""工作流事件模型 — WebSocket 传输的标准化事件对象。"""
+"""工作流事件模型 — WebSocket 传输的标准化事件对象。
 
-from enum import Enum
+所有事件字段直接平铺在事件类上，不再使用 payload 字典。
+每个事件类是独立的 Pydantic Model，字段类型安全。
+"""
+
+import json
+import uuid
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-import json
-import uuid
-import time
 
-
-class WorkflowCategory(str, Enum):
-    """事件分类 — 用于 Chrome Extension 区分事件类型。"""
+class WorkflowCategory(str):
+    """事件分类。"""
 
     PROGRESS = "progress"
-    """进度事件 — analysis/generation/review 等业务阶段状态"""
-
     MESSAGE = "message"
-    """消息事件 — LLM token 流式输出"""
-
     TOOL = "tool"
-    """工具事件 — 工具调用"""
-
     STATE = "state"
-    """状态事件 — LangGraph State 快照"""
-
     SYSTEM = "system"
-    """系统事件 — workflow 生命周期"""
+
+
+class EventKind(str):
+    """Workflow Event 类型。"""
+
+    WORKFLOW_STARTED = "workflow_started"
+    WORKFLOW_COMPLETED = "workflow_completed"
+    WORKFLOW_FAILED = "workflow_failed"
+    WORKFLOW_CANCELLED = "workflow_cancelled"
+    NODE_STARTED = "node_started"
+    NODE_COMPLETED = "node_completed"
+    NODE_FAILED = "node_failed"
+    TOKEN_DELTA = "token_delta"
+    TOOL_CALL = "tool_call"
+    STATE_UPDATED = "state_updated"
+    CUSTOM_EVENT = "custom_event"
 
 
 class WorkflowEvent(BaseModel):
@@ -34,33 +43,18 @@ class WorkflowEvent(BaseModel):
 
     所有事件通过 WebSocket 推送给 Chrome Extension。
     字段设计对 Extension 友好，不需要了解 LangGraph。
-
-    Attributes:
-        id: 事件唯一 ID（UUID）
-        workflow_id: 所属工作流 ID
-        sequence: 事件序号（用于追踪，类似 Kafka offset）
-        category: 事件分类（progress/message/tool/state/system）
-        kind: 事件类型
-        timestamp: Unix 时间戳（毫秒）
-        source: 事件来源（node 名称或 "system"）
-        payload: 事件负载（类型相关）
     """
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
     workflow_id: str
-
     sequence: int = 0
-
-    category: str
-
-    kind: str
-
-    timestamp: int = Field(default_factory=lambda: int(time.time() * 1000))
-
+    category: str = WorkflowCategory.PROGRESS
+    kind: str = EventKind.NODE_STARTED
+    display_name: str | None = None
+    timestamp: int = Field(
+        default_factory=lambda: int(datetime.now().timestamp() * 1000)
+    )
     source: str | None = None
-
-    payload: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"extra": "forbid"}
 
@@ -68,9 +62,9 @@ class WorkflowEvent(BaseModel):
 class NodeStartedEvent(WorkflowEvent):
     """节点开始事件。"""
 
-    kind: str = Field(default="node_started")
-    category: str = Field(default="progress")
-    source: str
+    kind: str = EventKind.NODE_STARTED
+    category: str = WorkflowCategory.PROGRESS
+    node_name: str
 
     @classmethod
     def create(
@@ -80,58 +74,73 @@ class NodeStartedEvent(WorkflowEvent):
         display_name: str | None = None,
         sequence: int = 0,
     ) -> "NodeStartedEvent":
-        """创建节点开始事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            node_name: 节点名称
-            display_name: 显示名称（Extension 用）
-            sequence: 事件序列号
-        """
         return cls(
             workflow_id=workflow_id,
-            category="progress",
-            kind="node_started",
+            node_name=node_name,
+            display_name=display_name or node_name,
             source=node_name,
             sequence=sequence,
-            payload={"node": node_name, "display_name": display_name or node_name},
         )
 
 
 class NodeCompletedEvent(WorkflowEvent):
     """节点完成事件。"""
 
-    kind: str = Field(default="node_completed")
-    category: str = Field(default="progress")
-    source: str
+    kind: str = EventKind.NODE_COMPLETED
+    category: str = WorkflowCategory.PROGRESS
+    node_name: str
 
     @classmethod
     def create(
-        cls, workflow_id: str, node_name: str, sequence: int = 0
+        cls,
+        workflow_id: str,
+        node_name: str,
+        display_name: str | None = None,
+        sequence: int = 0,
     ) -> "NodeCompletedEvent":
-        """创建节点完成事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            node_name: 节点名称
-            sequence: 事件序列号
-        """
         return cls(
             workflow_id=workflow_id,
-            category="progress",
-            kind="node_completed",
+            node_name=node_name,
+            display_name=display_name or node_name,
             source=node_name,
             sequence=sequence,
-            payload={"node": node_name},
+        )
+
+
+class NodeFailedEvent(WorkflowEvent):
+    """节点失败事件。"""
+
+    kind: str = EventKind.NODE_FAILED
+    category: str = WorkflowCategory.PROGRESS
+    node_name: str
+    error: str
+
+    @classmethod
+    def create(
+        cls,
+        workflow_id: str,
+        node_name: str,
+        error: str,
+        display_name: str | None = None,
+        sequence: int = 0,
+    ) -> "NodeFailedEvent":
+        return cls(
+            workflow_id=workflow_id,
+            node_name=node_name,
+            error=error,
+            display_name=display_name,
+            source=node_name,
+            sequence=sequence,
         )
 
 
 class TokenDeltaEvent(WorkflowEvent):
     """Token 流式输出事件。"""
 
-    kind: str = Field(default="token_delta")
-    category: str = Field(default="message")
+    kind: str = EventKind.TOKEN_DELTA
+    category: str = WorkflowCategory.MESSAGE
     source: str | None = None
+    delta: str = ""
 
     @classmethod
     def create(
@@ -140,27 +149,19 @@ class TokenDeltaEvent(WorkflowEvent):
         delta: str,
         source: str | None = None,
     ) -> "TokenDeltaEvent":
-        """创建 token 增量事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            delta: 增量文本
-            source: 来源（agent 名称或 node 名称）
-        """
         return cls(
             workflow_id=workflow_id,
-            category="message",
-            kind="token_delta",
+            delta=delta,
             source=source,
-            payload={"delta": delta},
         )
 
 
 class StateUpdatedEvent(WorkflowEvent):
     """State 快照更新事件。"""
 
-    kind: str = Field(default="state_updated")
-    category: str = Field(default="state")
+    kind: str = EventKind.STATE_UPDATED
+    category: str = WorkflowCategory.STATE
+    state: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def create(
@@ -168,42 +169,35 @@ class StateUpdatedEvent(WorkflowEvent):
         workflow_id: str,
         state: dict[str, Any],
     ) -> "StateUpdatedEvent":
-        """创建 state 更新事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            state: 当前 state 快照（自动过滤不可序列化对象）
-        """
-        serializable_state = {}
+        serializable_state: dict[str, Any] = {}
         for key, value in state.items():
             try:
                 json.dumps({"test": value})
                 serializable_state[key] = value
             except (TypeError, ValueError):
-                # 不可序列化的对象，转换为字符串表示
                 serializable_state[key] = f"<{type(value).__name__}>"
 
         return cls(
             workflow_id=workflow_id,
-            category="state",
-            kind="state_updated",
-            payload={"state": serializable_state},
+            state=serializable_state,
         )
 
 
 class WorkflowStartedEvent(WorkflowEvent):
     """工作流开始事件。"""
 
-    kind: str = Field(default="workflow_started")
-    category: str = Field(default="system")
+    kind: str = EventKind.WORKFLOW_STARTED
+    category: str = WorkflowCategory.SYSTEM
 
     @classmethod
-    def create(cls, workflow_id: str) -> "WorkflowStartedEvent":
-        """创建工作流开始事件。"""
+    def create(
+        cls,
+        workflow_id: str,
+        display_name: str | None = None,
+    ) -> "WorkflowStartedEvent":
         return cls(
             workflow_id=workflow_id,
-            category="system",
-            kind="workflow_started",
+            display_name=display_name,
             source="system",
         )
 
@@ -211,118 +205,74 @@ class WorkflowStartedEvent(WorkflowEvent):
 class WorkflowCompletedEvent(WorkflowEvent):
     """工作流完成事件。"""
 
-    kind: str = Field(default="workflow_completed")
-    category: str = Field(default="system")
+    kind: str = EventKind.WORKFLOW_COMPLETED
+    category: str = WorkflowCategory.SYSTEM
+    result: dict[str, Any] | None = None
 
     @classmethod
     def create(
         cls,
         workflow_id: str,
         result: dict[str, Any] | None = None,
+        display_name: str | None = None,
     ) -> "WorkflowCompletedEvent":
-        """创建工作流完成事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            result: 最终结果
-        """
         return cls(
             workflow_id=workflow_id,
-            category="system",
-            kind="workflow_completed",
+            result=result,
+            display_name=display_name,
             source="system",
-            payload={"result": result} if result else {},
         )
 
 
 class WorkflowFailedEvent(WorkflowEvent):
     """工作流失败事件。"""
 
-    kind: str = Field(default="workflow_failed")
-    category: str = Field(default="system")
+    kind: str = EventKind.WORKFLOW_FAILED
+    category: str = WorkflowCategory.SYSTEM
+    error: str
 
     @classmethod
     def create(
         cls,
         workflow_id: str,
         error: str,
+        display_name: str | None = None,
     ) -> "WorkflowFailedEvent":
-        """创建工作流失败事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            error: 错误信息
-        """
         return cls(
             workflow_id=workflow_id,
-            category="system",
-            kind="workflow_failed",
+            error=error,
+            display_name=display_name,
             source="system",
-            payload={"error": error},
         )
 
 
 class WorkflowCancelledEvent(WorkflowEvent):
     """工作流被取消事件。"""
 
-    kind: str = Field(default="workflow_cancelled")
-    category: str = Field(default="system")
-
-    @classmethod
-    def create(cls, workflow_id: str) -> "WorkflowCancelledEvent":
-        """创建工作流取消事件。
-
-        Args:
-            workflow_id: 工作流 ID
-        """
-        return cls(
-            workflow_id=workflow_id,
-            category="system",
-            kind="workflow_cancelled",
-            source="system",
-            payload={},
-        )
-
-
-class NodeFailedEvent(WorkflowEvent):
-    """节点失败事件。"""
-
-    kind: str = Field(default="node_failed")
-    category: str = Field(default="progress")
-    source: str
+    kind: str = EventKind.WORKFLOW_CANCELLED
+    category: str = WorkflowCategory.SYSTEM
 
     @classmethod
     def create(
         cls,
         workflow_id: str,
-        node_name: str,
-        error: str,
-        sequence: int = 0,
-    ) -> "NodeFailedEvent":
-        """创建节点失败事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            node_name: 节点名称
-            error: 错误信息
-            sequence: 事件序列号
-        """
+        display_name: str | None = None,
+    ) -> "WorkflowCancelledEvent":
         return cls(
             workflow_id=workflow_id,
-            category="progress",
-            kind="node_failed",
-            source=node_name,
-            sequence=sequence,
-            payload={"node": node_name, "error": error},
+            display_name=display_name,
+            source="system",
         )
 
 
 class CustomEvent(WorkflowEvent):
     """自定义业务事件。"""
 
-    kind: str = Field(default="custom_event")
-    category: str = Field(default="progress")
+    kind: str = EventKind.CUSTOM_EVENT
+    category: str = WorkflowCategory.PROGRESS
     source: str | None = None
+    event_type: str = ""
+    data: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def create(
@@ -333,50 +283,73 @@ class CustomEvent(WorkflowEvent):
         source: str | None = None,
         sequence: int = 0,
     ) -> "CustomEvent":
-        """创建自定义业务事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            event_type: 事件子类型
-            data: 事件数据
-            source: 来源
-            sequence: 事件序列号
-        """
         return cls(
             workflow_id=workflow_id,
-            category="progress",
-            kind="custom_event",
+            event_type=event_type,
+            data=data,
             source=source,
             sequence=sequence,
-            payload={"event_type": event_type, **data},
         )
 
 
 class ToolCallEvent(WorkflowEvent):
     """工具调用事件 (v3)。"""
 
-    kind: str = Field(default="tool_call")
-    category: str = Field(default="tool")
+    kind: str = EventKind.TOOL_CALL
+    category: str = WorkflowCategory.TOOL
     source: str | None = None
+    tool_name: str = ""
+    tool_input: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def create(
         cls,
         workflow_id: str,
+        node_name: str,
         tool_name: str,
-        tool_input: dict[str, Any],
+        tool_input: dict[str, Any] | None = None,
+        display_name: str | None = None,
+        sequence: int = 0,
     ) -> "ToolCallEvent":
-        """创建工具调用事件。
-
-        Args:
-            workflow_id: 工作流 ID
-            tool_name: 工具名称
-            tool_input: 工具输入参数
-        """
         return cls(
             workflow_id=workflow_id,
-            category="tool",
-            kind="tool_call",
-            source=tool_name,
-            payload={"tool_name": tool_name, "tool_input": tool_input},
+            tool_name=tool_name,
+            tool_input=tool_input or {},
+            display_name=display_name,
+            source=node_name,
+            sequence=sequence,
         )
+
+
+_EVENT_CLASS_BY_KIND: dict[str, type[WorkflowEvent]] = {
+    EventKind.WORKFLOW_STARTED: WorkflowStartedEvent,
+    EventKind.WORKFLOW_COMPLETED: WorkflowCompletedEvent,
+    EventKind.WORKFLOW_FAILED: WorkflowFailedEvent,
+    EventKind.WORKFLOW_CANCELLED: WorkflowCancelledEvent,
+    EventKind.NODE_STARTED: NodeStartedEvent,
+    EventKind.NODE_COMPLETED: NodeCompletedEvent,
+    EventKind.NODE_FAILED: NodeFailedEvent,
+    EventKind.TOKEN_DELTA: TokenDeltaEvent,
+    EventKind.TOOL_CALL: ToolCallEvent,
+    EventKind.STATE_UPDATED: StateUpdatedEvent,
+    EventKind.CUSTOM_EVENT: CustomEvent,
+}
+
+
+def parse_workflow_event(data: dict[str, Any] | str) -> WorkflowEvent:
+    """按 kind 还原为对应的 WorkflowEvent 子类。
+
+    Args:
+        data: 事件字典或 JSON 字符串
+
+    Returns:
+        对应 kind 的事件实例；未知 kind 时回退为 CustomEvent
+    """
+    if isinstance(data, str):
+        payload = json.loads(data)
+    else:
+        payload = dict(data)
+
+    kind = payload.get("kind", EventKind.CUSTOM_EVENT)
+    event_cls = _EVENT_CLASS_BY_KIND.get(kind, CustomEvent)
+    return event_cls.model_validate(payload)

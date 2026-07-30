@@ -51,8 +51,8 @@ class SSEManager {
       onError,
       onComplete,
       onStatusChange,
-      retry = true,
-      maxRetry = RECONNECT_CONFIG.maxRetry,
+      retry = false,
+      maxRetry = 0,
     } = options
 
     // 如果已存在连接，先关闭
@@ -110,10 +110,9 @@ class SSEManager {
     connection.eventSource.onopen = () => {
       console.log('[SSEManager] Connected:', runId)
       connection.status = ConnectionStatus.CONNECTED
-      connection.retryCount = 0
       this._notifyStatusChange(runId)
 
-      // 重置 Session 重连次数
+      // 收到首条消息后再清零 retryCount，避免空流反复 onopen 造成死循环
       sessionManager.resetReconnectCount(runId)
     }
 
@@ -121,6 +120,9 @@ class SSEManager {
     connection.eventSource.onmessage = (event) => {
       try {
         const workflowEvent = JSON.parse(event.data)
+
+        // 成功收到事件后再清零重试计数
+        connection.retryCount = 0
 
         // 更新 lastSequence
         if (workflowEvent.sequence) {
@@ -136,8 +138,11 @@ class SSEManager {
         // 检查是否完成
         if (workflowEvent.kind === 'workflow_completed') {
           this._handleComplete(runId, workflowEvent)
-        } else if (workflowEvent.kind === 'workflow_failed') {
-          this._handleError(runId, workflowEvent.payload?.error || 'Workflow failed')
+        } else if (
+          workflowEvent.kind === 'workflow_failed' ||
+          workflowEvent.kind === 'workflow_cancelled'
+        ) {
+          this._handleError(runId, workflowEvent.error || workflowEvent.kind)
         }
 
       } catch (error) {
@@ -149,21 +154,32 @@ class SSEManager {
     connection.eventSource.onerror = (error) => {
       console.error('[SSEManager] SSE error:', runId, error)
 
+      // 已完成/主动断开后 EventSource 仍可能触发 error，忽略
+      if (
+        !this._connections[runId] ||
+        connection.status === ConnectionStatus.DISCONNECTED
+      ) {
+        return
+      }
+
       connection.status = ConnectionStatus.ERROR
       this._notifyStatusChange(runId)
 
       // 关闭连接
-      connection.eventSource.close()
-      connection.eventSource = null
+      if (connection.eventSource) {
+        connection.eventSource.close()
+        connection.eventSource = null
+      }
 
       // 检查是否需要重连
       if (connection.retry && connection.retryCount < connection.maxRetry) {
         this._scheduleReconnect(runId)
       } else {
-        // 重连次数用完
+        // 不重试，直接回调 onError 通知 content script
         if (connection.onError) {
-          connection.onError(new Error(`Max retry reached: ${connection.retryCount}`))
+          connection.onError(new Error('SSE 连接失败'))
         }
+        this.disconnect(runId)
       }
     }
   }
@@ -251,7 +267,7 @@ class SSEManager {
     const sessionManager = getSessionManager()
 
     // 标记 Session 完成
-    sessionManager.markCompleted(runId, event.payload?.result)
+    sessionManager.markCompleted(runId, event.result)
 
     // 关闭连接
     this.disconnect(runId)

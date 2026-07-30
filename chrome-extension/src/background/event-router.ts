@@ -34,6 +34,7 @@ async function sendToContentScript(tabId, message) {
 
 /**
  * 系统事件处理器
+ * display_name 统一从事件顶层字段读取
  */
 function handleSystemEvent(event, tabId) {
   switch (event.kind) {
@@ -45,23 +46,18 @@ function handleSystemEvent(event, tabId) {
           status: 'running',
         },
       })
-      sendToContentScript(tabId, {
-        type: UIMessageType.STATUS_UPDATE,
-        payload: {
-          status: 'running',
-          message: '连接成功，正在生成回复',
-        },
-      })
+      sendStatusUpdate(tabId, 'running', event.display_name)
       break
 
     case 'workflow_completed':
       sendToContentScript(tabId, {
         type: UIMessageType.WORKFLOW_COMPLETED,
         payload: {
-          status: 'completed',
-          result: event.payload?.result,
+          status: event.display_name || 'completed',
+          result: event.result,
         },
       })
+      sendStatusUpdate(tabId, 'completed', event.display_name)
       break
 
     case 'workflow_cancelled':
@@ -69,60 +65,50 @@ function handleSystemEvent(event, tabId) {
         type: UIMessageType.WORKFLOW_CANCELLED,
         payload: {},
       })
-      sendToContentScript(tabId, {
-        type: UIMessageType.STATUS_UPDATE,
-        payload: {
-          status: 'cancelled',
-          message: '工作流已取消',
-        },
-      })
+      sendStatusUpdate(tabId, 'cancelled', event.display_name)
       break
 
     case 'workflow_failed':
       sendToContentScript(tabId, {
         type: UIMessageType.WORKFLOW_ERROR,
         payload: {
-          error: event.payload?.error || '工作流执行失败',
+          error: event.error || '工作流执行失败',
         },
       })
-      sendToContentScript(tabId, {
-        type: UIMessageType.STATUS_UPDATE,
-        payload: {
-          status: 'error',
-          message: '工作流执行失败',
-        },
-      })
+      sendStatusUpdate(tabId, 'error', event.display_name)
       break
   }
 }
 
+function sendStatusUpdate(tabId, status, message) {
+  if (!message) return
+  sendToContentScript(tabId, {
+    type: UIMessageType.STATUS_UPDATE,
+    payload: { status, message },
+  })
+}
+
 /**
  * 进度事件处理器
+ * display_name 统一从事件顶层字段读取
  */
 function handleProgressEvent(event, tabId) {
   let message = ''
   let statusType = 'progress'
 
   switch (event.kind) {
-    case 'node_started': {
-      const displayName = event.payload.display_name || event.source
-      message = displayName === event.source
-        ? `正在执行: ${event.source}`
-        : displayName
-      break
-    }
-
+    case 'node_started':
     case 'node_completed':
-      message = `${event.source} 完成`
+      message = event.display_name
       break
 
     case 'node_failed':
-      message = `${event.source} 失败: ${event.payload.error}`
+      message = event.display_name
       statusType = 'error'
       break
 
     case 'custom_event':
-      message = event.payload.event_type || '处理中'
+      message = event.event_type || '处理中'
       break
   }
 
@@ -142,7 +128,7 @@ function handleMessageEvent(event, tabId) {
     sendToContentScript(tabId, {
       type: UIMessageType.TOKEN_DELTA,
       payload: {
-        delta: event.payload.delta,
+        delta: event.delta,
       },
     })
   }
@@ -155,7 +141,7 @@ function handleStateEvent(event, tabId) {
   sendToContentScript(tabId, {
     type: UIMessageType.STATE_UPDATE,
     payload: {
-      state: event.payload.state,
+      state: event.state,
     },
   })
 }
@@ -168,8 +154,8 @@ function handleToolEvent(event, tabId) {
     sendToContentScript(tabId, {
       type: UIMessageType.TOOL_CALL,
       payload: {
-        toolName: event.payload.tool_name,
-        toolInput: event.payload.tool_input,
+        toolName: event.tool_name,
+        toolInput: event.tool_input,
       },
     })
   }
@@ -216,11 +202,8 @@ class EventRouter {
    */
   getStatusMessage(event) {
     if (event.category === 'progress') {
-      if (event.kind === 'node_started') {
-        return event.payload.display_name || event.source
-      }
-      if (event.kind === 'node_completed') {
-        return `${event.source} 完成`
+      if (event.kind === 'node_started' || event.kind === 'node_completed') {
+        return event.display_name || ''
       }
     }
     return ''

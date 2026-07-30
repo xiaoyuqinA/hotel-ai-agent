@@ -17,7 +17,6 @@ from shared.workflow_events.models import (
     NodeFailedEvent,
     CustomEvent,
     ToolCallEvent,
-    WorkflowCategory,
 )
 from shared.streaming.runner import WorkflowRunner, create_runner
 from shared.workflow_events.mapper import ProjectionMapper
@@ -48,7 +47,6 @@ class TestWorkflowEventModel:
             workflow_id="wf-001",
             kind="test_event",
             category="progress",
-            payload={"key": "value"},
         )
         assert event.workflow_id == "wf-001"
         assert event.kind == "test_event"
@@ -60,7 +58,7 @@ class TestWorkflowEventModel:
         """测试 TokenDeltaEvent 创建。"""
         event = TokenDeltaEvent.create("wf-001", "hello ")
         assert event.kind == "token_delta"
-        assert event.payload["delta"] == "hello "
+        assert event.delta == "hello "
         assert event.workflow_id == "wf-001"
 
     def test_node_started_event_create(self):
@@ -68,19 +66,19 @@ class TestWorkflowEventModel:
         event = NodeStartedEvent.create("wf-001", "analysis", "AI分析评论")
         assert event.kind == "node_started"
         assert event.source == "analysis"
-        assert event.payload["display_name"] == "AI分析评论"
+        assert event.display_name == "AI分析评论"
 
     def test_workflow_completed_event_create(self):
         """测试 WorkflowCompletedEvent 创建。"""
         event = WorkflowCompletedEvent.create("wf-001", {"result": "success"})
         assert event.kind == "workflow_completed"
-        assert event.payload == {"result": {"result": "success"}}
+        assert event.result == {"result": "success"}
 
     def test_workflow_failed_event_create(self):
         """测试 WorkflowFailedEvent 创建。"""
         event = WorkflowFailedEvent.create("wf-001", "timeout error")
         assert event.kind == "workflow_failed"
-        assert event.payload["error"] == "timeout error"
+        assert event.error == "timeout error"
 
 
 class TestWorkflowRunner:
@@ -202,7 +200,9 @@ class TestWorkflowCategory:
         }
 
         for name, value in expected.items():
-            assert getattr(WorkflowCategory, name).value == value
+            from shared.workflow_events.models import WorkflowCategory
+
+            assert getattr(WorkflowCategory, name) == value
 
 
 class TestProjectionMapperCompletion:
@@ -235,7 +235,7 @@ class TestProjectionMapperCompletion:
         completed = events[-1]
         assert completed.kind == "workflow_completed"
         # 验证 result 携带了 reply_content
-        result = completed.payload.get("result")
+        result = completed.result
         assert result is not None
         assert result.get("reply_content") == "感谢您的反馈"
 
@@ -262,7 +262,7 @@ class TestProjectionMapperCompletion:
         completed = events[-1]
         assert completed.kind == "workflow_completed"
         # 无自定义 state 时 result 不包含 reply_content
-        result = completed.payload.get("result")
+        result = completed.result
         assert result is None or "reply_content" not in result
 
 
@@ -276,7 +276,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": BusinessEvent.ANALYSIS_STARTED,
+                    "kind": BusinessEvent.ANALYSIS_STARTED,
                     "message": "正在分析客户评论",
                 }
             },
@@ -288,7 +288,7 @@ class TestProjectionMapperCustom:
         assert isinstance(result, NodeStartedEvent)
         assert result.kind == "node_started"
         assert result.source == "analysis"
-        assert result.payload["display_name"] == "分析评论中"
+        assert result.display_name == "分析开始"
         assert result.category == "progress"
 
     def test_generation_completed_transforms_to_node_completed(self):
@@ -298,7 +298,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": BusinessEvent.GENERATION_COMPLETED,
+                    "kind": BusinessEvent.GENERATION_COMPLETED,
                 }
             },
         }
@@ -318,7 +318,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": BusinessEvent.ANALYSIS_FAILED,
+                    "kind": BusinessEvent.ANALYSIS_FAILED,
                     "error": "LLM API 超时",
                 }
             },
@@ -330,7 +330,8 @@ class TestProjectionMapperCustom:
         assert isinstance(result, NodeFailedEvent)
         assert result.kind == "node_failed"
         assert result.source == "analysis"
-        assert result.payload["error"] == "LLM API 超时"
+        assert result is not None
+        assert result.error == "LLM API 超时"
         assert result.category == "progress"
 
     def test_review_started_transforms_to_node_started(self):
@@ -340,7 +341,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": BusinessEvent.REVIEW_STARTED,
+                    "kind": BusinessEvent.REVIEW_STARTED,
                     "message": "正在审核回复",
                 }
             },
@@ -351,7 +352,7 @@ class TestProjectionMapperCustom:
         assert result is not None
         assert isinstance(result, NodeStartedEvent)
         assert result.source == "review"
-        assert result.payload["display_name"] == "审核回复中"
+        assert result.display_name == "审核开始"
 
     def test_unknown_custom_event_transforms_to_custom_event(self):
         """未知 custom 事件 → CustomEvent"""
@@ -360,7 +361,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": "custom_action",
+                    "kind": "custom_action",
                     "message": "自定义消息",
                 }
             },
@@ -371,7 +372,7 @@ class TestProjectionMapperCustom:
         assert result is not None
         assert isinstance(result, CustomEvent)
         assert result.kind == "custom_event"
-        assert result.payload["event_type"] == "custom_action"
+        assert result.event_type == "custom_action"
 
     def test_values_event_transforms_to_state_updated(self):
         """values → StateUpdatedEvent"""
@@ -388,7 +389,7 @@ class TestProjectionMapperCustom:
         assert result is not None
         assert isinstance(result, StateUpdatedEvent)
         assert result.kind == "state_updated"
-        assert result.payload["state"]["value"] == "test_result"
+        assert result.state == {"value": "test_result"}
         assert result.category == "state"
 
     def test_events_have_sequence(self):
@@ -399,7 +400,7 @@ class TestProjectionMapperCustom:
             "method": "custom",
             "params": {
                 "data": {
-                    "event": BusinessEvent.ANALYSIS_STARTED,
+                    "kind": BusinessEvent.ANALYSIS_STARTED,
                 }
             },
         }

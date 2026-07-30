@@ -90,8 +90,8 @@ async function reconnectSession(session) {
 
   sseManager.connect(session.runId, {
     lastSequence: session.lastSequence,
-    retry: true,
-    maxRetry: 3,  // 重连限制
+    retry: false,
+    maxRetry: 0,
     onEvent: (event) => {
       eventRouter.route(event, session.tabId)
     },
@@ -202,13 +202,18 @@ async function handleGenerateReply(payload, tabId) {
     sseManager.connect(run_id, {
       apiUrl,
       lastSequence: 0,
-      retry: true,
-      maxRetry: 5,
+      retry: false,
+      maxRetry: 0,
       onEvent: (event) => {
         eventRouter.route(event, targetTabId)
       },
       onError: (error) => {
         sessionManager.markFailed(run_id, error.message)
+        eventRouter.route({
+          category: 'system',
+          kind: 'workflow_failed',
+          payload: { error: error.message },
+        }, targetTabId)
       },
       onComplete: (event) => {
         // 由 SSE Manager 处理
