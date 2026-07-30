@@ -139,6 +139,9 @@ async function handleMessage(message, sender) {
   const { type, payload } = message
 
   switch (type) {
+    case 'PING':
+      return { pong: true }
+
     case 'GENERATE_REPLY':
       return await handleGenerateReply(payload, sender.tab?.id)
 
@@ -166,7 +169,7 @@ async function handleMessage(message, sender) {
  * 生成回复
  */
 async function handleGenerateReply(payload, tabId) {
-  const { review, threadId, hotel_id } = payload
+  const { review, threadId, hotel_context } = payload
   const targetTabId = tabId || activeTabId
 
   if (!targetTabId) {
@@ -184,7 +187,7 @@ async function handleGenerateReply(payload, tabId) {
     const response = await fetch(`${apiUrl}/review/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reviews_content: review, hotel_id }),
+      body: JSON.stringify({ reviews_content: review, hotel_context }),
     })
 
     if (!response.ok) {
@@ -192,7 +195,7 @@ async function handleGenerateReply(payload, tabId) {
     }
 
     const { run_id, thread_id } = await response.json()
-    console.log('[ServiceWorker] Workflow run created:', run_id)
+    console.log('[ServiceWorker] Workflow run created:', run_id, 'targetTabId:', targetTabId)
 
     // 2. 创建 Session
     await sessionManager.createSession(run_id, targetTabId)

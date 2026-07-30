@@ -120,6 +120,7 @@ class SSEManager {
     connection.eventSource.onmessage = (event) => {
       try {
         const workflowEvent = JSON.parse(event.data)
+        console.debug('[SSEManager] Received event:', runId, workflowEvent.kind, 'sequence:', workflowEvent.sequence)
 
         // 成功收到事件后再清零重试计数
         connection.retryCount = 0

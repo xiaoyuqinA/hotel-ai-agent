@@ -31,9 +31,28 @@ async function getAdapter(): Promise<OTAAdapter | null> {
 /**
  * 获取当前酒店配置（只读）
  * 通过 ConfigService 而非直接操作 chrome.storage
+ * 扩展上下文失效时自动等待重连
  */
 async function _getCurrentHotel() {
-  return configService.getCurrentHotel();
+  // 通过 PING 检查 runtime 是否真正可用
+  const valid = await _isRuntimeValid();
+  if (!valid) {
+    console.warn('[AssistantWidget] Runtime invalid (PING failed), waiting for reconnect...');
+    const ready = await _ensureRuntimeReady();
+    if (!ready) {
+      console.warn('[AssistantWidget] Runtime recovery failed, returning null');
+      return null;
+    }
+    // 重新初始化 adapter
+    getAdapter().then(a => a?.initialize?.());
+  }
+
+  try {
+    return await configService.getCurrentHotel();
+  } catch (e) {
+    console.warn('[AssistantWidget] Failed to get current hotel:', e, (e as Error)?.message);
+    return null;
+  }
 }
 
 /**
@@ -47,11 +66,47 @@ async function _getCurrentHotelConfig() {
 
 // ── 初始化 ─────────────────────────────────────────────────────────────────
 
+/**
+ * 检测扩展上下文是否有效（通过发送测试消息验证）
+ */
+async function _isRuntimeValid(): Promise<boolean> {
+  try {
+    if (!chrome.runtime?.id) return false;
+    // 发送 PING 验证连接真正可用
+    const resp = await chrome.runtime.sendMessage({ type: 'PING' }).catch(() => null);
+    return resp?.pong === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 等待 Service Worker 就绪（上下文失效时重试）
+ */
+async function _ensureRuntimeReady(maxRetries = 10, interval = 500): Promise<boolean> {
+  for (let i = 0; i < maxRetries; i++) {
+    if (await _isRuntimeValid()) return true;
+    // 尝试重建连接（触发 Service Worker 重启）
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: 'PING' }).catch(() => null);
+      if (resp) return true;
+    } catch { /* 忽略 */ }
+    await new Promise(r => setTimeout(r, interval));
+  }
+  return false;
+}
+
 function init() {
+  // 注册消息监听
   chrome.runtime.onMessage.addListener(handleMessage);
   injectStyles();
   injectFAB();
   getAdapter().then(a => a?.initialize?.());
+
+  // 监听 Service Worker 重启（断开 → 重连）
+  chrome.runtime.onConnect.addListener(() => {
+    console.log('[AssistantWidget] runtime reconnected');
+  });
 
   console.log('[AssistantWidget] initialized');
 }
@@ -435,18 +490,30 @@ async function onGenerate() {
   const hotelConfig = hotelId ? await _getCurrentHotelConfig() : null;
   const replySettings = hotelConfig?.reply_settings;
 
-  chrome.runtime.sendMessage({
-    type: 'GENERATE_REPLY',
-    payload: {
-      review,
-      hotel_id: hotelId,
-      hotel_context: hotelConfig ? {
-        hotel_id: hotelId,
-        name: hotelConfig.name,
-        reply_settings: replySettings,
-      } : undefined,
-    },
-  });
+  // 扩展上下文可能已失效，兜底
+  try {
+    if (!chrome.runtime?.id) {
+      updateStatus('error', '扩展已刷新，请重试');
+      setPanelView('error');
+      return;
+    }
+
+    chrome.runtime.sendMessage({
+      type: 'GENERATE_REPLY',
+      payload: {
+        review,
+        hotel_context: hotelConfig ? {
+          hotel_id: hotelId,
+          name: hotelConfig.name,
+          reply_settings: replySettings,
+        } : null,
+      },
+    });
+  } catch (e) {
+    console.error('[AssistantWidget] sendMessage failed:', e);
+    store.setError('扩展连接异常，请刷新页面后重试');
+    setPanelView('error');
+  }
 }
 
 async function onPublish() {

@@ -104,7 +104,7 @@ async def create_review_run(request: Request) -> dict:
 
     POST /review/run
     Content-Type: application/json
-    {"reviews_content": "...", "thread_id": "xxx", "hotel_id": "hotel_001"}
+    {"reviews_content": "...", "thread_id": "xxx", "hotel_context": {...}}
 
     返回：
     {"run_id": "run_xxx", "status": "pending"}
@@ -112,7 +112,7 @@ async def create_review_run(request: Request) -> dict:
     body = await request.json()
     reviews_content = body.get("reviews_content", "")
     thread_id = body.get("thread_id", "")
-    hotel_id = body.get("hotel_id", "")
+    hotel_context = body.get("hotel_context")
 
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
@@ -130,10 +130,9 @@ async def create_review_run(request: Request) -> dict:
     )
 
     # 准备 input 和 config
-    # 如果前端传了 hotel_id，以 tuple (hotel_id, reviews_content) 形式传入
-    # input_mapper 会解析出 hotel_id
-    if hotel_id:
-        input_data = workflow.input_mapper((hotel_id, reviews_content))
+    # 如果前端传了 hotel_context，直接注入 state，跳过 YAML 加载
+    if hotel_context:
+        input_data = workflow.input_mapper((hotel_context, reviews_content))
     else:
         input_data = workflow.input_mapper(reviews_content)
     config = {"configurable": {"thread_id": thread_id}}

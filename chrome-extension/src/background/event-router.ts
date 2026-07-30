@@ -26,9 +26,11 @@ export const UIMessageType = {
  */
 async function sendToContentScript(tabId, message) {
   try {
+    console.debug('[EventRouter] Sending to tab', tabId, ':', message.type)
     await chrome.tabs.sendMessage(tabId, message)
+    console.debug('[EventRouter] Sent OK to tab', tabId, ':', message.type)
   } catch (error) {
-    console.debug('[EventRouter] Message send failed:', error.message)
+    console.debug('[EventRouter] Message send failed to tab', tabId, ':', message.type, error.message)
   }
 }
 
