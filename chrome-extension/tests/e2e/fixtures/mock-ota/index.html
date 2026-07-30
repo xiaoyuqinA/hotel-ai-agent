@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock OTA - 酒店评论管理</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 40px auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .header { background: #1a73e8; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0; }
+    .header h1 { font-size: 18px; font-weight: 500; }
+    .content { padding: 24px; }
+    .review-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .reviewer-name { font-weight: 500; color: #333; }
+    .review-rating { color: #ff9800; font-size: 14px; }
+    .review-date { color: #999; font-size: 12px; }
+    .comment-content { color: #555; line-height: 1.6; margin-bottom: 12px; }
+    .review-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tag { background: #e3f2fd; color: #1a73e8; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .reply-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; }
+    .reply-section h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
+    .reply-textarea { width: 100%; min-height: 100px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; resize: vertical; }
+    .reply-textarea:focus { outline: none; border-color: #1a73e8; }
+    .button-group { display: flex; gap: 8px; margin-top: 12px; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .btn-primary { background: #1a73e8; color: white; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-secondary { background: #f5f5f5; color: #666; }
+    .btn-secondary:hover { background: #e0e0e0; }
+    #submit-result { margin-top: 12px; padding: 12px; background: #e8f5e9; border-radius: 6px; display: none; color: #2e7d32; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>酒店评论管理 - Mock OTA</h1>
+    </div>
+    <div class="content">
+      <div class="review-card" data-review-id="mock-review-001">
+        <div class="review-header">
+          <span class="reviewer-name">张三</span>
+          <span class="review-rating">★★★★☆ 4.0</span>
+        </div>
+        <div class="review-date">2024-01-15</div>
+        <div class="comment-content">房间卫生很差，床单有污渍，毛巾也没换。希望酒店能改进卫生条件。</div>
+        <div class="review-tags">
+          <span class="tag">卫生问题</span>
+          <span class="tag">需要改进</span>
+        </div>
+
+        <div class="reply-section">
+          <h3>回复评论</h3>
+          <textarea class="reply-textarea" placeholder="请输入回复内容..."></textarea>
+          <div class="button-group">
+            <button class="btn btn-primary" id="submit-btn">提交回复</button>
+            <button class="btn btn-secondary" id="cancel-btn">取消</button>
+          </div>
+          <div id="submit-result"></div>
+        </div>
+      </div>
+
+      <div class="review-card" data-review-id="mock-review-002">
+        <div class="review-header">
+          <span class="reviewer-name">李四</span>
+          <span class="review-rating">★★★★★ 5.0</span>
+        </div>
+        <div class="review-date">2024-01-14</div>
+        <div class="comment-content">服务很好，房间干净整洁，下次还会来住。</div>
+        <div class="review-tags">
+          <span class="tag">好评</span>
+          <span class="tag">推荐</span>
+        </div>
+
+        <div class="reply-section">
+          <h3>回复评论</h3>
+          <textarea class="reply-textarea" placeholder="请输入回复内容..."></textarea>
+          <div class="button-group">
+            <button class="btn btn-primary" id="submit-btn-2">提交回复</button>
+            <button class="btn btn-secondary" id="cancel-btn-2">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 模拟提交回复
+    document.querySelectorAll('.btn-primary').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const card = this.closest('.review-card');
+        const textarea = card.querySelector('.reply-textarea');
+        const result = card.querySelector('#submit-result');
+
+        if (textarea.value.trim()) {
+          if (result) {
+            result.style.display = 'block';
+            result.textContent = '回复已提交: ' + textarea.value.substring(0, 50) + '...';
+          }
+          // 触发自定义事件供测试监听
+          document.dispatchEvent(new CustomEvent('reply-submitted', {
+            detail: { content: textarea.value }
+          }));
+        }
+      });
+    });
+
+    // 模拟取消
+    document.querySelectorAll('.btn-secondary').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const card = this.closest('.review-card');
+        const textarea = card.querySelector('.reply-textarea');
+        textarea.value = '';
+      });
+    });
+  </script>
+</body>
+</html>

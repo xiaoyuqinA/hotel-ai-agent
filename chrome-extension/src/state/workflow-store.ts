@@ -192,6 +192,10 @@ export function createStore(): WorkflowStore {
       switch (event.kind) {
         case EventKind.WORKFLOW_COMPLETED: {
           _state.status = State.COMPLETED;
+          // 从 result 提取 reply_content 并保存
+          if (event.result?.reply_content) {
+            _state.replyContent = event.result.reply_content as string;
+          }
           break;
         }
         case EventKind.WORKFLOW_FAILED:

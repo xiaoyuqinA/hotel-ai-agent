@@ -1,92 +1,43 @@
 /**
  * Popup Script — 三视图路由
  *
- * 视图 1：创建酒店（首次使用）
+ * 视图 1：创建酒店（首次使用 / 主动创建）
  * 视图 2：酒店首页（现有酒店，展示配置概览）
  * 视图 3：编辑设置（ReplySettings 编辑）
+ *
+ * 全部配置通过 HotelConfigService 操作，
+ * 不再直接读写 chrome.storage 或调用后端 API。
  */
 
-const CURRENT_HOTEL_KEY = 'current_hotel';
+import { LocalHotelConfigRepository } from '../config/local_repository.js';
+import { HotelConfigService } from '../config/service.js';
+import type { CurrentHotel, HotelConfig, ReplySettings } from '../config/models.js';
+import { DEFAULT_REPLY_SETTINGS } from '../config/models.js';
 
-// DOM
-let contentEl;
+// ── Service ───────────────────────────────────────────────────────────────────
 
-// ── 工具函数 ─────────────────────────────────────────────────────────────────
+const configService = new HotelConfigService(new LocalHotelConfigRepository());
 
-async function getApiUrl() {
-  const resp = await chrome.runtime.sendMessage({ type: 'GET_API_URL' });
-  return resp.apiUrl || 'http://localhost:8000';
-}
+// ── DOM ───────────────────────────────────────────────────────────────────────
 
-async function getCurrentHotel() {
-  const result = await chrome.storage.local.get(CURRENT_HOTEL_KEY);
-  return result[CURRENT_HOTEL_KEY] || null;
-}
-
-async function setCurrentHotel(hotel) {
-  await chrome.storage.local.set({ [CURRENT_HOTEL_KEY]: hotel });
-}
-
-async function clearCurrentHotel() {
-  await chrome.storage.local.remove(CURRENT_HOTEL_KEY);
-}
-
-function apiUrl(path) {
-  return getApiUrl().then(base => `${base}${path}`);
-}
-
-// ── API ──────────────────────────────────────────────────────────────────────
-
-async function apiFetch(method, path, body = null) {
-  const url = await apiUrl(path);
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (body) opts.body = JSON.stringify(body);
-
-  const resp = await fetch(url, opts);
-  if (!resp.ok) {
-    let detail = resp.statusText;
-    try { const d = await resp.json(); detail = d.detail || detail; } catch (_) {}
-    throw new Error(detail);
-  }
-  if (resp.status === 204) return null;
-  return await resp.json();
-}
-
-async function createHotel(name, city) {
-  return await apiFetch('POST', '/api/hotels', { name, city });
-}
-
-async function listHotels() {
-  return await apiFetch('GET', '/api/hotels');
-}
-
-async function loadSettings(hotelId) {
-  return await apiFetch('GET', `/api/hotels/${hotelId}/reply-settings`);
-}
-
-async function saveSettings(hotelId, settings) {
-  return await apiFetch('PUT', `/api/hotels/${hotelId}/reply-settings`, settings);
-}
+let contentEl: HTMLElement;
 
 // ── 路由 ─────────────────────────────────────────────────────────────────────
 
 async function render() {
-  contentEl = document.getElementById('app-content');
+  contentEl = document.getElementById('app-content')!;
 
-  const hotel = await getCurrentHotel();
-  if (!hotel) {
+  const current = await configService.getCurrentHotel();
+  if (!current) {
     return renderCreateHotel();
   }
 
-  return renderHotelHome(hotel);
+  return renderHotelHome(current);
 }
 
 // ── 视图 1：创建酒店 ─────────────────────────────────────────────────────────
 
-function renderCreateHotel(errorMsg) {
+function renderCreateHotel(errorMsg?: string) {
   contentEl.innerHTML = `
     <div class="section">
       <div class="label">欢迎使用</div>
@@ -106,35 +57,37 @@ function renderCreateHotel(errorMsg) {
     </div>
   `;
 
-  document.getElementById('create-hotel-btn').addEventListener('click', onCreateHotel);
+  document.getElementById('create-hotel-btn')!.addEventListener('click', onCreateHotel);
 }
 
 async function onCreateHotel() {
-  const name = document.getElementById('hotel-name-input').value.trim();
-  const city = document.getElementById('hotel-city-input').value.trim();
+  const nameInput = document.getElementById('hotel-name-input') as HTMLInputElement;
+  const cityInput = document.getElementById('hotel-city-input') as HTMLInputElement;
+  const name = nameInput.value.trim();
+  const city = cityInput.value.trim();
 
   if (!name) {
-    document.getElementById('create-status').textContent = '请输入酒店名称';
-    document.getElementById('create-status').className = 'status-text error';
+    showStatus('create-status', '请输入酒店名称', 'error');
     return;
   }
   if (!city) {
-    document.getElementById('create-status').textContent = '请输入所在城市';
-    document.getElementById('create-status').className = 'status-text error';
+    showStatus('create-status', '请输入所在城市', 'error');
     return;
   }
 
-  const btn = document.getElementById('create-hotel-btn');
+  const btn = document.getElementById('create-hotel-btn') as HTMLButtonElement;
   btn.disabled = true;
   btn.textContent = '创建中...';
 
   try {
-    const hotel = await createHotel(name, city);
-    await setCurrentHotel({ hotel_id: hotel.hotel_id, hotel_name: hotel.hotel_name });
+    const hotel = await configService.createHotel({ name, city });
+    await configService.setCurrentHotel({
+      hotel_id: hotel.id,
+      hotel_name: hotel.name,
+    });
     await render();
   } catch (e) {
-    document.getElementById('create-status').textContent = '创建失败：' + e.message;
-    document.getElementById('create-status').className = 'status-text error';
+    showStatus('create-status', '创建失败：' + (e as Error).message, 'error');
     btn.disabled = false;
     btn.textContent = '创建酒店';
   }
@@ -142,12 +95,12 @@ async function onCreateHotel() {
 
 // ── 视图 2：酒店首页 ─────────────────────────────────────────────────────────
 
-async function renderHotelHome(hotel) {
+async function renderHotelHome(current: CurrentHotel) {
   contentEl.innerHTML = `
     <div class="section">
       <div class="hotel-selector" id="hotel-selector-btn">
         <span class="icon">🏨</span>
-        <span class="name">${hotel.hotel_name}</span>
+        <span class="name">${current.hotel_name}</span>
         <span class="arrow">▼</span>
       </div>
     </div>
@@ -166,16 +119,17 @@ async function renderHotelHome(hotel) {
     </div>
   `;
 
-  loadSettingsPreview(hotel.hotel_id);
+  loadSettingsPreview(current.hotel_id);
 
-  document.getElementById('hotel-selector-btn').addEventListener('click', onShowHotelList);
-  document.getElementById('edit-settings-btn').addEventListener('click', () => renderEditSettings(hotel));
+  document.getElementById('hotel-selector-btn')!.addEventListener('click', onShowHotelList);
+  document.getElementById('edit-settings-btn')!.addEventListener('click', () => renderEditSettings(current));
 }
 
-async function loadSettingsPreview(hotelId) {
-  const container = document.getElementById('settings-preview');
+async function loadSettingsPreview(hotelId: string) {
+  const container = document.getElementById('settings-preview')!;
   try {
-    const settings = await loadSettings(hotelId);
+    const hotel = await configService.getHotel(hotelId);
+    const settings = hotel?.reply_settings ?? DEFAULT_REPLY_SETTINGS;
     container.innerHTML = `
       <div class="label">回复配置</div>
       <div class="config-item">
@@ -189,27 +143,27 @@ async function loadSettingsPreview(hotelId) {
       <div class="config-item">
         <div class="config-label">回复规则</div>
         <div class="config-value">
-          ${(settings.rules || []).map(r => '• ' + r).join('<br>') || '无'}
+          ${(settings.rules || []).map((r: string) => '• ' + r).join('<br>') || '无'}
         </div>
       </div>
     `;
   } catch (e) {
     container.innerHTML = `
       <div class="label">回复配置</div>
-      <div class="status-text error">加载失败：${e.message}</div>
+      <div class="status-text error">加载失败：${(e as Error).message}</div>
     `;
   }
 }
 
 // ── 视图 3：编辑设置 ─────────────────────────────────────────────────────────
 
-function renderEditSettings(hotel) {
+async function renderEditSettings(current: CurrentHotel) {
   contentEl.innerHTML = `
     <div class="section">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <button class="btn btn-secondary" id="back-btn"
                 style="width:auto;padding:6px 14px;font-size:13px;">← 返回</button>
-        <span style="font-weight:500;">${hotel.hotel_name}</span>
+        <span style="font-weight:500;">${current.hotel_name}</span>
       </div>
     </div>
 
@@ -232,44 +186,43 @@ function renderEditSettings(hotel) {
     </div>
   `;
 
-  loadSettings(hotel.hotel_id).then(settings => {
-    document.getElementById('edit-tone').value = settings.tone || '';
-    document.getElementById('edit-style').value = settings.style || '';
-    document.getElementById('edit-rules').value = (settings.rules || []).join('\n');
-  }).catch(e => {
-    document.getElementById('edit-status').textContent = '加载失败：' + e.message;
-    document.getElementById('edit-status').className = 'status-text error';
-  });
+  // 加载当前设置
+  try {
+    const hotel = await configService.getHotel(current.hotel_id);
+    const settings = hotel?.reply_settings ?? DEFAULT_REPLY_SETTINGS;
+    (document.getElementById('edit-tone') as HTMLInputElement).value = settings.tone || '';
+    (document.getElementById('edit-style') as HTMLInputElement).value = settings.style || '';
+    (document.getElementById('edit-rules') as HTMLTextAreaElement).value = (settings.rules || []).join('\n');
+  } catch (e) {
+    showStatus('edit-status', '加载失败：' + (e as Error).message, 'error');
+  }
 
-  document.getElementById('back-btn').addEventListener('click', () => render());
-  document.getElementById('cancel-edit-btn').addEventListener('click', () => render());
-  document.getElementById('save-settings-btn').addEventListener('click', () => onSaveSettings(hotel));
+  document.getElementById('back-btn')!.addEventListener('click', () => render());
+  document.getElementById('cancel-edit-btn')!.addEventListener('click', () => render());
+  document.getElementById('save-settings-btn')!.addEventListener('click', () => onSaveSettings(current));
 }
 
-async function onSaveSettings(hotel) {
-  const tone = document.getElementById('edit-tone').value.trim();
-  const style = document.getElementById('edit-style').value.trim();
-  const rulesRaw = document.getElementById('edit-rules').value.trim();
+async function onSaveSettings(current: CurrentHotel) {
+  const tone = (document.getElementById('edit-tone') as HTMLInputElement).value.trim();
+  const style = (document.getElementById('edit-style') as HTMLInputElement).value.trim();
+  const rulesRaw = (document.getElementById('edit-rules') as HTMLTextAreaElement).value.trim();
   const rules = rulesRaw ? rulesRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 
   if (!tone) {
-    document.getElementById('edit-status').textContent = '回复语气不能为空';
-    document.getElementById('edit-status').className = 'status-text error';
+    showStatus('edit-status', '回复语气不能为空', 'error');
     return;
   }
 
-  const btn = document.getElementById('save-settings-btn');
+  const btn = document.getElementById('save-settings-btn') as HTMLButtonElement;
   btn.disabled = true;
   btn.textContent = '保存中...';
 
   try {
-    await saveSettings(hotel.hotel_id, { tone, style, rules });
-    document.getElementById('edit-status').textContent = '✅ 设置已保存';
-    document.getElementById('edit-status').className = 'status-text success';
+    await configService.updateReplySettings(current.hotel_id, { tone, style, rules });
+    showStatus('edit-status', '✅ 设置已保存', 'success');
     setTimeout(() => render(), 1200);
   } catch (e) {
-    document.getElementById('edit-status').textContent = '保存失败：' + e.message;
-    document.getElementById('edit-status').className = 'status-text error';
+    showStatus('edit-status', '保存失败：' + (e as Error).message, 'error');
     btn.disabled = false;
     btn.textContent = '保存设置';
   }
@@ -278,17 +231,17 @@ async function onSaveSettings(hotel) {
 // ── 酒店列表弹窗 ─────────────────────────────────────────────────────────────
 
 async function onShowHotelList() {
-  const modal = document.getElementById('hotel-list-modal');
-  const hotels = await listHotels();
-  const current = await getCurrentHotel();
+  const modal = document.getElementById('hotel-list-modal')!;
+  const hotels = await configService.listHotels();
+  const current = await configService.getCurrentHotel();
 
   modal.innerHTML = `
     <div class="modal-content">
       <h3>选择酒店</h3>
       ${hotels.map(h => `
-        <div class="modal-hotel-item" data-id="${h.hotel_id}" data-name="${h.hotel_name}">
-          <div class="m-name">${h.hotel_name} ${current && current.hotel_id === h.hotel_id ? '✓' : ''}</div>
-          <div class="m-id">${h.hotel_id}</div>
+        <div class="modal-hotel-item" data-id="${h.id}" data-name="${h.name}">
+          <div class="m-name">${h.name} ${current && current.hotel_id === h.id ? '✓' : ''}</div>
+          <div class="m-id">${h.id}</div>
         </div>
       `).join('')}
       <div class="modal-new-hotel" id="modal-new-hotel-btn">+ 创建新酒店</div>
@@ -297,17 +250,17 @@ async function onShowHotelList() {
 
   modal.querySelectorAll('.modal-hotel-item').forEach(el => {
     el.addEventListener('click', async () => {
-      await setCurrentHotel({
-        hotel_id: el.dataset.id,
-        hotel_name: el.dataset.name,
+      await configService.setCurrentHotel({
+        hotel_id: (el as HTMLElement).dataset.id!,
+        hotel_name: (el as HTMLElement).dataset.name!,
       });
       modal.classList.add('hidden');
       await render();
     });
   });
 
-  document.getElementById('modal-new-hotel-btn').addEventListener('click', async () => {
-    await clearCurrentHotel();
+  document.getElementById('modal-new-hotel-btn')!.addEventListener('click', async () => {
+    await configService.clearCurrentHotel();
     modal.classList.add('hidden');
     renderCreateHotel();
   });
@@ -318,8 +271,12 @@ async function onShowHotelList() {
   });
 }
 
-// ── 生成回复（通过 background） ──────────────────────────────────────────────
+// ── 通用 ──────────────────────────────────────────────────────────────────────
 
-
+function showStatus(id: string, msg: string, type: 'error' | 'success' | 'hidden') {
+  const el = document.getElementById(id)!;
+  el.textContent = msg;
+  el.className = `status-text ${type}`;
+}
 
 document.addEventListener('DOMContentLoaded', render);

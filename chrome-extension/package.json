@@ -4,16 +4,26 @@
   "description": "智能生成酒店评论回复的 Chrome 扩展。",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp public/manifest.json dist/ && mkdir -p dist/icons && cp -R public/icons/* dist/icons/ && mkdir -p dist/popup && cp src/popup/index.html dist/popup/ && cp src/content-script/styles.css dist/",
-    "preview": "vite preview"
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/chrome": "^0.2.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "jsdom": "^29.1.1",
+    "serve": "^14.2.6",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

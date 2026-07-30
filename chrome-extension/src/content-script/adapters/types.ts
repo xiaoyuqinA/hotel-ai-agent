@@ -17,7 +17,10 @@ export interface OTAAdapter {
   readonly name: string;
 
   /** 判断当前页面是否属于此 OTA 平台 */
-  matches(): boolean;
+  matches(): boolean | Promise<boolean>;
+
+  /** 初始化 adapter（注册事件监听器等） */
+  initialize?(): void;
 
   /** 从页面提取评论上下文 */
   getReview(): Promise<ReviewContext | null>;

@@ -11,16 +11,28 @@ import { SELECTORS } from './selectors.js';
 
 export class CtripAdapter implements OTAAdapter {
   readonly name = 'ctrip';
+  private _lastSelection = '';
 
-  matches(): boolean {
+  initialize(): void {
+    document.addEventListener('selectionchange', () => {
+      this._lastSelection = window.getSelection()?.toString().trim() ?? '';
+      console.log('[CtripAdapter] selectionchange → _lastSelection:', this._lastSelection);
+    });
+  }
+
+  async matches(): Promise<boolean> {
+    try {
+      const result = await chrome.storage.local.get('__HOTEL_AI_TEST_MODE');
+      if (result['__HOTEL_AI_TEST_MODE']) return true;
+    } catch { }
     return location.hostname.includes('ctrip.com');
   }
 
   async getReview(): Promise<ReviewContext | null> {
     // Step 1: 用户选中文本优先
-    const sel = window.getSelection();
-    if (sel?.toString().trim()) {
-      return { platform: 'ctrip', content: sel.toString().trim() };
+    if (this._lastSelection) {
+      console.log('[CtripAdapter] getReview → returning _lastSelection:', this._lastSelection);
+      return { platform: 'ctrip', content: this._lastSelection };
     }
 
     // Step 2: 携程特定选择器

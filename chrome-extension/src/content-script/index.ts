@@ -13,9 +13,11 @@
 import { createStore } from '../state/workflow-store.js';
 import type { OTAAdapter } from './adapters/types.js';
 import { detectAdapter } from './adapters/registry.js';
+import { LocalHotelConfigRepository } from '../config/local_repository.js';
+import { HotelConfigService } from '../config/service.js';
 
 const store = createStore();
-const CURRENT_HOTEL_KEY = 'current_hotel';
+const configService = new HotelConfigService(new LocalHotelConfigRepository());
 
 let _adapter: OTAAdapter | null = null;
 let _currentReview = '';
@@ -24,11 +26,23 @@ async function getAdapter(): Promise<OTAAdapter | null> {
   return _adapter;
 }
 
-// ── Hotel Context（只读） ────────────────────────────────────────────────────
+// ── Hotel Context（只读，通过 ConfigService） ────────────────────────────────
 
+/**
+ * 获取当前酒店配置（只读）
+ * 通过 ConfigService 而非直接操作 chrome.storage
+ */
 async function _getCurrentHotel() {
-  const result = await chrome.storage.local.get(CURRENT_HOTEL_KEY);
-  return result[CURRENT_HOTEL_KEY] || null;
+  return configService.getCurrentHotel();
+}
+
+/**
+ * 获取当前酒店完整的 HotelConfig（含 reply_settings）
+ */
+async function _getCurrentHotelConfig() {
+  const current = await _getCurrentHotel();
+  if (!current) return null;
+  return configService.getHotel(current.hotel_id);
 }
 
 // ── 初始化 ─────────────────────────────────────────────────────────────────
@@ -417,9 +431,21 @@ async function onGenerate() {
   setPanelView('running');
   setFABState('generating');
 
+  // 携带 hotel_context 发送（含 reply_settings，未来可用于后端）
+  const hotelConfig = hotelId ? await _getCurrentHotelConfig() : null;
+  const replySettings = hotelConfig?.reply_settings;
+
   chrome.runtime.sendMessage({
     type: 'GENERATE_REPLY',
-    payload: { review, hotel_id: hotelId },
+    payload: {
+      review,
+      hotel_id: hotelId,
+      hotel_context: hotelConfig ? {
+        hotel_id: hotelId,
+        name: hotelConfig.name,
+        reply_settings: replySettings,
+      } : undefined,
+    },
   });
 }
 
