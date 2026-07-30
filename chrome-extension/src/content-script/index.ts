@@ -26,47 +26,6 @@ async function getAdapter(): Promise<OTAAdapter | null> {
   return _adapter;
 }
 
-// ── Hotel Context（只读，通过 ConfigService） ────────────────────────────────
-
-/**
- * 获取当前酒店配置（只读）
- * 通过 Service Worker 读取 chrome.storage，避免 Content Script
- * 的 chrome.storage 在扩展刷新后抛 Extension context invalidated。
- */
-async function _getCurrentHotel() {
-  try {
-    const resp = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_HOTEL' });
-    if (resp?.current_hotel) {
-      return resp.current_hotel;
-    }
-    if (resp?.error) {
-      console.warn('[AssistantWidget] GET_CURRENT_HOTEL error:', resp.error);
-    }
-    return null;
-  } catch (e) {
-    console.warn('[AssistantWidget] Failed to get current hotel via SW:', e);
-    return null;
-  }
-}
-
-/**
- * 获取当前酒店完整的 HotelConfig（含 reply_settings）
- */
-async function _getCurrentHotelConfig() {
-  const current = await _getCurrentHotel();
-  if (!current) return null;
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: 'GET_HOTEL_CONFIG',
-      payload: { hotel_id: current.hotel_id },
-    });
-    return resp?.hotel_config ?? null;
-  } catch (e) {
-    console.warn('[AssistantWidget] Failed to get hotel config via SW:', e);
-    return null;
-  }
-}
-
 // ── 初始化 ─────────────────────────────────────────────────────────────────
 
 /**
@@ -218,7 +177,8 @@ async function showPanel() {
 
   panel.classList.remove('hidden');
 
-  await _getCurrentHotel(); // 确保 hotel 加载完成（酒店为可选）
+  // hotel 配置由 Service Worker 在生成回复时自行读取
+  // Content Script 不再需要主动获取 hotel 信息
 
   // 首次展示：初始化为 idle；非首次：保持当前视图（completed/failed 等）
   if (!panel.dataset.view) {
@@ -253,8 +213,6 @@ function setPanelView(view) {
     case 'completed':  renderCompleted(); break;
     case 'error':      renderError(); break;
     case 'editing':    renderEditing(); break;
-    case 'publishing': renderPublishing(); break;
-    case 'published':  renderPublished(); break;
   }
 }
 
@@ -285,7 +243,6 @@ function renderNoHotel() {
 }
 
 async function renderIdle() {
-  const hotel = await _getCurrentHotel();
   const adapter = await getAdapter();
   const ctx = adapter ? await adapter.getReview() : null;
   const review = ctx?.content || '';
@@ -294,9 +251,8 @@ async function renderIdle() {
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
       <div class="ha-hotel-badge">
-        ${hotel ? `🏨 ${hotel.hotel_name}` : `✨ 默认回复模式`}
+        ✨ AI 回复助手
       </div>
-      ${!hotel ? `<div class="ha-tip">配置酒店后可自定义回复语气</div>` : ''}
       <div class="ha-review-box" id="ha-review-text">
         ${review || '<span class="ha-placeholder">选中评论后，点击「生成回复」</span>'}
       </div>
@@ -364,49 +320,17 @@ function renderCompleted() {
       <div class="ha-reply-box" id="ha-reply-box">${reply || '（空回复）'}</div>
       <div class="ha-actions">
         <button class="ha-btn ha-btn-secondary" id="ha-edit-btn">✎ 编辑回复</button>
-        <button class="ha-btn ha-btn-primary" id="ha-publish-btn">确认发布</button>
+        <button class="ha-btn ha-btn-primary" id="ha-copy-btn">📋 复制</button>
       </div>
       <button class="ha-btn ha-btn-text" id="ha-retry-btn">重新生成</button>
     </div>
   `;
   bindHeaderEvents();
   document.getElementById('ha-edit-btn').addEventListener('click', () => setPanelView('editing'));
-  document.getElementById('ha-publish-btn').addEventListener('click', onPublish);
+  document.getElementById('ha-copy-btn').addEventListener('click', onCopy);
   document.getElementById('ha-retry-btn').addEventListener('click', onGenerate);
 }
 
-function renderPublishing() {
-  panel.innerHTML = renderHeader() + `
-    <div class="ha-panel-body">
-      <div class="ha-status-bar running">
-        <span class="ha-status-dot"></span>
-        <span class="ha-status-text">正在发布到 OTA...</span>
-      </div>
-      <div style="text-align:center;padding:20px;color:#999;">
-        <div style="font-size:28px;margin-bottom:10px;">⏳</div>
-        <p>正在将回复填入页面并提交</p>
-      </div>
-    </div>
-  `;
-  bindHeaderEvents();
-}
-
-function renderPublished() {
-  panel.innerHTML = renderHeader() + `
-    <div class="ha-panel-body">
-      <div class="ha-status-bar completed">
-        <span class="ha-status-dot"></span>
-        <span class="ha-status-text">已发布</span>
-      </div>
-      <div style="text-align:center;padding:20px;color:#52c41a;font-size:15px;">
-        ✅ 回复已发布到 OTA 平台
-      </div>
-      <button class="ha-btn ha-btn-primary" id="ha-done-btn">完成</button>
-    </div>
-  `;
-  bindHeaderEvents();
-  document.getElementById('ha-done-btn').addEventListener('click', dismissPanel);
-}
 
 function renderError() {
   const error = store.getError() || '未知错误';
@@ -466,8 +390,8 @@ function bindHeaderEvents() {
 // ── 核心业务 ─────────────────────────────────────────────────────────────────
 
 async function onGenerate() {
-  const hotel = await _getCurrentHotel();
-  const hotelId = hotel?.hotel_id ?? null;
+  // hotel_context 由 Service Worker 自己从 storage 读取
+  // Content Script 只传 review
 
   const adapter = await getAdapter();
   if (!adapter) {
@@ -485,15 +409,11 @@ async function onGenerate() {
   }
 
   _currentReview = review;
-  store.startRun(null, hotelId);
+  store.startRun(null);
   setPanelView('running');
   setFABState('generating');
 
-  // 携带 hotel_context 发送（含 reply_settings，未来可用于后端）
-  const hotelConfig = hotelId ? await _getCurrentHotelConfig() : null;
-  const replySettings = hotelConfig?.reply_settings;
-
-  // 扩展上下文可能已失效，兜底
+  // 只发 review，hotel_context 由 Service Worker 自己从 storage 读取
   try {
     if (!chrome.runtime?.id) {
       updateStatus('error', '扩展已刷新，请重试');
@@ -503,55 +423,36 @@ async function onGenerate() {
 
     await chrome.runtime.sendMessage({
       type: 'GENERATE_REPLY',
-      payload: {
-        review,
-        hotel_context: hotelConfig ? {
-          hotel_id: hotelId,
-          name: hotelConfig.name,
-          reply_settings: replySettings,
-        } : null,
-      },
+      payload: { review },
     }).catch((e) => {
-      console.error('[AssistantWidget] sendMessage rejected:', e);
+      console.error('[AssistantWidget] sendMessage rejected:', (e as Error)?.message, e);
       throw e;
     });
   } catch (e) {
-    console.error('[AssistantWidget] sendMessage failed:', e);
+    console.error('[AssistantWidget] sendMessage failed:', (e as Error)?.message, e);
     store.setError('扩展连接异常，请刷新页面后重试');
     setPanelView('error');
   }
 }
 
-async function onPublish() {
+async function onCopy() {
   const reply = store.getReply();
   if (!reply) return;
 
-  setPanelView('publishing');
-
-  const adapter = await getAdapter();
-  if (!adapter) {
-    store.setError('无可用 Adapter');
-    setPanelView('error');
-    return;
-  }
-
-  const filled = await adapter.fillReply(reply);
-
-  if (!filled) {
-    store.setError('无法找到 OTA 页面回复框');
-    setPanelView('error');
-    return;
-  }
-
-  // MVP: publish() 会 throw，不自动发布，回复已填入让用户手动确认
   try {
-    await adapter.publish();
-    setPanelView('published');
-    setTimeout(() => dismissPanel(), 2000);
-    setFABState('idle');
+    await navigator.clipboard.writeText(reply);
+    updateStatus('completed', '✅ 已复制到剪贴板');
   } catch {
-    updateStatus('completed', '回复已填入，请手动发布');
-    setPanelView('completed');
+    // fallback: 使用 textarea 选择复制
+    const textarea = document.createElement('textarea');
+    textarea.value = reply;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    updateStatus('completed', '✅ 已复制到剪贴板');
   }
 }
 
