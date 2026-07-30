@@ -8,6 +8,8 @@ __pycache__/
 storage/*.db
 storage/*.db-shm
 storage/*.db-wal
+storage/postgres_data/
+storage/redis_data/
 !storage/.gitkeep
 
 # Chrome Extension
