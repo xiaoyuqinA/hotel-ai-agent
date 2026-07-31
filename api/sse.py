@@ -64,7 +64,7 @@ async def _run_workflow_background(
             run_id,
             display_name=DisplayName.WORKFLOW_STARTED,
         )
-        started_event.sequence = 1
+        started_event.sequence = 0
         await save_and_publish(started_event)
 
         runner = WorkflowRunner(workflow_id=run_id)
