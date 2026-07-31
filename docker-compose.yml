@@ -69,13 +69,13 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: ${PWD}/storage/postgres_data
+      device: ${POSTGRES_DATA_DIR:-${PWD}/storage/postgres_data}
       o: bind
   redis_data:
     driver: local
     driver_opts:
       type: none
-      device: ${PWD}/storage/redis_data
+      device: ${REDIS_DATA_DIR:-${PWD}/storage/redis_data}
       o: bind
 
 networks:
