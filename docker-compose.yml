@@ -7,12 +7,16 @@ x-logging:
     max-size: "100m"
     max-file: "30"
 
+x-timezone: &timezone
+  TZ: Asia/Shanghai
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: hotel_ai_postgres
     logging: *logging-config
     environment:
+      <<: *timezone
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: hotel_ai
@@ -33,6 +37,8 @@ services:
     image: redis:7-alpine
     container_name: hotel_ai_redis
     logging: *logging-config
+    environment:
+      <<: *timezone
     ports:
       - "6380:6379"
     volumes:
@@ -52,6 +58,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      <<: *timezone
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
