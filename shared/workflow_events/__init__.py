@@ -24,6 +24,7 @@ from shared.workflow_events.models import (
     WorkflowFailedEvent,
     CustomEvent,
     ToolCallEvent,
+    parse_workflow_event,
 )
 
 from shared.workflow_events.kinds import (
@@ -32,4 +33,3 @@ from shared.workflow_events.kinds import (
 )
 
 from shared.workflow_events.mapper import ProjectionMapper
-from shared.streaming.runner import WorkflowRunner, create_runner

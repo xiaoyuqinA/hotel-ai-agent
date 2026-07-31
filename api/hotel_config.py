@@ -6,10 +6,8 @@ GET    /api/hotels/{hotel_id}/reply-settings   → 查询回复配置
 PUT    /api/hotels/{hotel_id}/reply-settings   → 更新回复配置
 """
 
-import re
-
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from shared.hotel_config import (
     HotelConfigService,
@@ -51,6 +49,13 @@ class CreateHotelRequest(BaseModel):
     name: str
     city: str
 
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("酒店名称不能为空")
+        return v.strip()
+
 
 def _generate_hotel_id(name: str) -> str:
     """从酒店名称生成 hotel_id。
@@ -77,11 +82,24 @@ async def create_hotel(body: CreateHotelRequest) -> HotelInfo:
     try:
         return _get_service().create_hotel(hotel_id, body.name, body.city)
     except HotelConfigAlreadyExists:
-        # 如果 ID 冲突，加时间戳后缀
+        # 如果 ID 冲突，加时间戳后缀，并循环直到创建成功
         import time
 
-        hotel_id = f"{hotel_id}_{int(time.time())}"
-        return _get_service().create_hotel(hotel_id, body.name, body.city)
+        max_retries = 5
+        for attempt in range(max_retries):
+            timestamp = int(time.time() * 1000)  # 毫秒级精度
+            new_id = f"{hotel_id}_{timestamp}"
+            try:
+                return _get_service().create_hotel(new_id, body.name, body.city)
+            except HotelConfigAlreadyExists:
+                if attempt < max_retries - 1:
+                    continue
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"无法为酒店 '{body.name}' 创建唯一 ID，请重试",
+                )
+        # unreachable: retry loop either returns or raises
+        raise HTTPException(status_code=500, detail="创建酒店失败")
 
 
 @router.get(

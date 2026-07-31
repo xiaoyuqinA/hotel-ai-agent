@@ -3,9 +3,11 @@
 from langgraph.config import get_stream_writer
 
 from shared.runtime.streaming import stream_agent_with_events
-from shared.workflow_events.kinds import BusinessEvent
 
-from capabilities.guest_experience.agents.review_analysis_agent.schemas import ReviewAnalysisResult
+from capabilities.guest_experience.agents.review_analysis_agent.schemas import (
+    ReviewAnalysisResult,
+)
+from shared.workflow_events.emitter import NodeEventEmitter
 
 from ..state import ReviewReplyState
 
@@ -21,11 +23,9 @@ async def analysis_node(state: ReviewReplyState) -> ReviewReplyState:
     Token 流式输出由 LangGraph messages projection 自动处理。
     """
     writer = get_stream_writer()
+    emitter = NodeEventEmitter(writer)
 
-    writer({
-        "event": BusinessEvent.ANALYSIS_STARTED,
-        "message": "正在分析客户评论",
-    })
+    emitter.analysis_started()
 
     try:
         reviews_content = state.get("reviews_content", "")
@@ -38,23 +38,14 @@ async def analysis_node(state: ReviewReplyState) -> ReviewReplyState:
             if event_type == "token":
                 accumulated += chunk
             elif event_type == "node_error":
-                writer({
-                    "event": BusinessEvent.ANALYSIS_FAILED,
-                    "error": chunk,
-                })
+                emitter.analysis_failed(chunk)
 
         result = ReviewAnalysisResult.model_validate_json(accumulated)
 
-        writer({
-            "event": BusinessEvent.ANALYSIS_COMPLETED,
-            "result": result.model_dump(),
-        })
+        emitter.analysis_completed()
 
         return {"anaylay_result": result}
 
     except Exception as e:
-        writer({
-            "event": BusinessEvent.ANALYSIS_FAILED,
-            "error": str(e),
-        })
+        emitter.analysis_failed(str(e))
         raise

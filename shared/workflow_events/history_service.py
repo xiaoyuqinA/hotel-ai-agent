@@ -80,7 +80,9 @@ async def list_runs(
                     "result": r.result,
                     "error": r.error,
                     "created_at": r.created_at.isoformat() if r.created_at else None,
-                    "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                    "completed_at": r.completed_at.isoformat()
+                    if r.completed_at
+                    else None,
                 }
                 for r in records
             ],
@@ -120,8 +122,12 @@ async def get_run_detail(run_id: str) -> dict | None:
                 "input_data": run_record.input_data,
                 "result": run_record.result,
                 "error": run_record.error,
-                "created_at": run_record.created_at.isoformat() if run_record.created_at else None,
-                "completed_at": run_record.completed_at.isoformat() if run_record.completed_at else None,
+                "created_at": run_record.created_at.isoformat()
+                if run_record.created_at
+                else None,
+                "completed_at": run_record.completed_at.isoformat()
+                if run_record.completed_at
+                else None,
             },
             "events": [
                 {
@@ -130,48 +136,25 @@ async def get_run_detail(run_id: str) -> dict | None:
                     "category": e.category,
                     "kind": e.kind,
                     "source": e.source,
-                    "payload": e.payload,
+                    **{
+                        k: v
+                        for k, v in (e.payload or {}).items()
+                        if k
+                        not in (
+                            "id",
+                            "workflow_id",
+                            "sequence",
+                            "category",
+                            "kind",
+                            "source",
+                        )
+                    },
                     "created_at": e.created_at.isoformat() if e.created_at else None,
                 }
                 for e in event_records
             ],
         }
 
-
-async def get_run_events(
-    run_id: str,
-    last_sequence: int = 0,
-    limit: int = 100,
-) -> list[dict]:
-    """获取 run 的事件（支持分页）。"""
-    session_factory = _get_session_factory()
-    async with session_factory() as session:
-        stmt = (
-            select(WorkflowEventRecord)
-            .where(
-                and_(
-                    WorkflowEventRecord.workflow_id == run_id,
-                    WorkflowEventRecord.sequence > last_sequence,
-                )
-            )
-            .order_by(WorkflowEventRecord.sequence)
-            .limit(limit)
-        )
-        result = await session.execute(stmt)
-        records = result.scalars().all()
-
-        return [
-            {
-                "id": e.id,
-                "sequence": e.sequence,
-                "category": e.category,
-                "kind": e.kind,
-                "source": e.source,
-                "payload": e.payload,
-                "created_at": e.created_at.isoformat() if e.created_at else None,
-            }
-            for e in records
-        ]
 
 
 async def replay_events(
@@ -212,7 +195,19 @@ async def replay_events(
                 "category": e.category,
                 "kind": e.kind,
                 "source": e.source,
-                "payload": e.payload,
+                **{
+                    k: v
+                    for k, v in (e.payload or {}).items()
+                    if k
+                    not in (
+                        "id",
+                        "workflow_id",
+                        "sequence",
+                        "category",
+                        "kind",
+                        "source",
+                    )
+                },
             }
             for e in records
         ]
