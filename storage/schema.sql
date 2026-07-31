@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
     input_data JSONB,
     result JSONB,
     error TEXT,
+    canceled VARCHAR(1) DEFAULT '0',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE
