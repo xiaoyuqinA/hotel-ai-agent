@@ -151,7 +151,15 @@ async def save_event(event: WorkflowEvent) -> None:
             payload=event.model_dump(mode="json", exclude_none=True),
         )
         session.add(record)
-        await session.commit()
+        try:
+            await session.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger("hotel_ai").error(
+                "save_event failed: workflow_id=%s sequence=%s error=%s",
+                event.workflow_id, event.sequence, e,
+            )
+            raise
 
 
 async def get_events_after(

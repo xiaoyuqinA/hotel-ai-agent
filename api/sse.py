@@ -88,18 +88,19 @@ async def _run_workflow_background(
             await update_run_status(run_id, "completed", result=result)
 
     except Exception as e:
+        logger.error("Workflow run failed: %s", str(e))
         try:
             await save_and_publish(
                 WorkflowFailedEvent.create(
                     run_id, str(e), display_name=DisplayName.WORKFLOW_FAILED
                 )
             )
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.error("Failed to publish failure event: %s", str(e2))
         try:
             await update_run_status(run_id, "failed", error=str(e))
-        except Exception:
-            pass
+        except Exception as e3:
+            logger.error("Failed to update run status: %s", str(e3))
     finally:
         await close_channel(run_id)
 
