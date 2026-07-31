@@ -54,7 +54,7 @@ services:
       - hotel_ai_net
 
   admin:
-    build: ./admin
+    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-admin:latest
     container_name: hotel_ai_admin
     logging: *logging-config
     ports:
