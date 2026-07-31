@@ -120,10 +120,11 @@ async def create_review_run(request: Request) -> dict:
 
     POST /review/run
     Content-Type: application/json
-    {"reviews_content": "...", "thread_id": "xxx", "hotel_context": {...}}
+    {"reviews_content": "...", "invite_code": "...", "hotel_context": {...}}
 
-    返回：
-    {"run_id": "run_xxx", "status": "pending"}
+    返回格式：
+    {"code": "success", "message": "", "data": {"run_id": "run_xxx", ...}}
+    {"code": "failed", "message": "错误描述", "data": null}
     """
     body = await request.json()
     reviews_content = body.get("reviews_content", "")
@@ -138,7 +139,7 @@ async def create_review_run(request: Request) -> dict:
     from shared.invite.service import validate_invite_code
     valid, message = await validate_invite_code(invite_code)
     if not valid:
-        raise HTTPException(status_code=403, detail=message)
+        return {"code": "failed", "message": message, "data": None}
 
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
@@ -156,7 +157,6 @@ async def create_review_run(request: Request) -> dict:
     )
 
     # 准备 input 和 config
-    # 如果前端传了 hotel_context，直接注入 state，跳过 YAML 加载
     if hotel_context:
         input_data = workflow.input_mapper((hotel_context, reviews_content))
     else:
@@ -180,7 +180,7 @@ async def create_review_run(request: Request) -> dict:
         "thread_id": thread_id,
     }
     logger.info("POST /review/run response: %s", _json.dumps(response_data, ensure_ascii=False, default=str))
-    return response_data
+    return {"code": "success", "message": "", "data": response_data}
 
 
 router.add_api_route(
@@ -316,4 +316,27 @@ router.add_api_route(
     methods=["POST"],
     summary="取消 Workflow Run",
     description="取消正在运行的 Workflow Run",
+)
+
+
+async def validate_invite(request: Request) -> dict:
+    """验证邀请码有效性。
+
+    POST /review/invite/validate
+    {"code": "INVITE-XXX"}
+    -> {"valid": true}
+    """
+    body = await request.json()
+    code = body.get("code", "")
+    from shared.invite.service import validate_invite_code
+    valid, message = await validate_invite_code(code)
+    return {"valid": valid, "message": message if not valid else ""}
+
+
+router.add_api_route(
+    "/invite/validate",
+    validate_invite,
+    methods=["POST"],
+    summary="验证邀请码",
+    description="验证邀请码是否有效、未过期、未停用",
 )

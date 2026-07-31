@@ -220,27 +220,21 @@ async function handleGenerateReply(payload, tabId) {
       body,
     })
 
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '')
-      console.error('[ServiceWorker] POST /review/run failed:', response.status, errBody)
-      // 解析后端返回的错误详情
-      let errorMsg = `请求失败 (${response.status})`
-      try {
-        const errData = JSON.parse(errBody)
-        if (errData.detail) errorMsg = errData.detail
-      } catch {}
-      // 发送 WORKFLOW_ERROR 给 Content Script 显示错误
+    const result = await response.json()
+    console.log('[ServiceWorker] POST /review/run response:', JSON.stringify(result))
+
+    // 统一返回格式: { code, message, data }
+    if (result.code === 'failed') {
+      console.error('[ServiceWorker] Workflow run failed:', result.message)
       eventRouter.route({
         category: 'system',
         kind: 'workflow_failed',
-        payload: { error: errorMsg },
+        payload: { error: result.message || '请求失败' },
       }, targetTabId)
-      return { error: errorMsg }
+      return { error: result.message }
     }
 
-    const result = await response.json()
-    console.log('[ServiceWorker] POST /review/run response:', JSON.stringify(result))
-    const { run_id, thread_id } = result
+    const { run_id, thread_id } = result.data || {}
     console.log('[ServiceWorker] Workflow run created:', run_id, 'targetTabId:', targetTabId)
 
     // 2. 创建 Session
