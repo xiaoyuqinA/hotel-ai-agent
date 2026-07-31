@@ -9,13 +9,15 @@ GET /review/stream/{run_id}
 
 import asyncio
 import json as _json
+import logging
 import time
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import Response, StreamingResponse
+
+logger = logging.getLogger("hotel_ai")
 
 from shared.workflow_events.models import (
     WorkflowEvent,
@@ -118,7 +120,7 @@ async def create_review_run(request: Request) -> dict:
     hotel_context = body.get("hotel_context")
 
     import json as _json
-    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] [API] POST /review/run request: {_json.dumps(body, ensure_ascii=False, default=str)}")
+    logger.info("POST /review/run request: %s", _json.dumps(body, ensure_ascii=False, default=str))
 
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
@@ -159,7 +161,7 @@ async def create_review_run(request: Request) -> dict:
         "status": "pending",
         "thread_id": thread_id,
     }
-    print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}] [API] POST /review/run response: {_json.dumps(response_data, ensure_ascii=False, default=str)}")
+    logger.info("POST /review/run response: %s", _json.dumps(response_data, ensure_ascii=False, default=str))
     return response_data
 
 

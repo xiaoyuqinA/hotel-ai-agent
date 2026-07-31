@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,7 +10,17 @@ from api.sse import router as sse_router
 from api.hotel_config import router as hotel_config_router
 from shared.runtime.workflow_runtime import WorkflowRuntime
 
-# ── Global Runtime ──────────────────────────────────────────────────────────────
+# ── 日志配置 ──────────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger("hotel_ai")
+
+# ── Global Runtime ─────────────────────────────────────────────────────────────
 
 _runtime = WorkflowRuntime()
 
