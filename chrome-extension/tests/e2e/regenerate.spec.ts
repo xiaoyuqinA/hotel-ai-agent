@@ -97,6 +97,17 @@ test.describe('重新生成 E2E', () => {
       await page.waitForLoadState('domcontentloaded')
       await page.waitForSelector('.comment-content', { timeout: 5000 })
 
+      // 监听 Service Worker Console 日志
+      const worker = context.serviceWorkers()[0]
+      if (worker) {
+        worker.on('console', msg => {
+          const text = msg.text()
+          if (text.includes('[ServiceWorker]') || text.includes('[SSEManager]') || text.includes('[EventRouter]')) {
+            console.log('[SW]', text)
+          }
+        })
+      }
+
       const fab = page.locator('#hotel-ai-fab')
       await expect(fab).toBeVisible({ timeout: 15000 })
       console.log('[Test] FAB visible')

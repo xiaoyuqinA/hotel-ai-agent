@@ -119,7 +119,12 @@ class SSEManager {
     // 接收消息
     connection.eventSource.onmessage = (event) => {
       try {
-        const workflowEvent = JSON.parse(event.data)
+        const raw = event.data
+        if (raw === ': heartbeat' || raw.startsWith(': heartbeat')) {
+          console.debug('[SSEManager] Heartbeat received:', runId)
+          return  // 心跳事件，不需要处理
+        }
+        const workflowEvent = JSON.parse(raw)
         console.debug('[SSEManager] Received event:', runId, workflowEvent.kind, 'sequence:', workflowEvent.sequence)
 
         // 成功收到事件后再清零重试计数
