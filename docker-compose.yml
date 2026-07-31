@@ -54,7 +54,7 @@ services:
       - hotel_ai_net
 
   admin:
-    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-admin:latest
+    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-admin:linux-arm64
     container_name: hotel_ai_admin
     logging: *logging-config
     ports:
@@ -73,7 +73,7 @@ services:
       - hotel_ai_net
 
   api:
-    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:linux-amd64
+    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:linux-arm64
     container_name: hotel_ai_api
     logging: *logging-config
     ports:
