@@ -37,7 +37,7 @@ services:
       - hotel_ai_net
 
   api:
-    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:latest
+    image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:linux-amd64
     container_name: hotel_ai_api
     ports:
       - "8000:8000"
