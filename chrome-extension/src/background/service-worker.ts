@@ -35,6 +35,9 @@
 import { getSessionManager, SessionStatus } from './session-manager.js'
 import { getSSEManager, ConnectionStatus } from './sse-manager.js'
 import { getEventRouter } from './event-router.js'
+import { LocalHotelConfigRepository } from '../config/local_repository.js'
+import { HotelConfigService } from '../config/service.js'
+import { inviteCodeService } from '../config/invite_service.js'
 
 // ── 配置 ─────────────────────────────────────────────────────────────────────
 
@@ -171,16 +174,16 @@ async function handleMessage(message, sender) {
 async function handleGenerateReply(payload, tabId) {
   const { review, threadId } = payload
 
-  // Service Worker 自己从 chrome.storage.local 读取 hotel 配置
+  // 通过 Service 层读取配置，避免直接操作 chrome.storage.local
   let hotel_context = null
   let invite_code = null
   try {
-    const storageResult = await chrome.storage.local.get(['current_hotel', 'hotel_configs', 'invite_code'])
-    const current = storageResult['current_hotel']
-    const configs = storageResult['hotel_configs'] || []
-    invite_code = storageResult['invite_code'] || null
+    const configService = new HotelConfigService(new LocalHotelConfigRepository())
+    const current = await configService.getCurrentHotel()
+    invite_code = await inviteCodeService.get()
+
     if (current) {
-      const hotel = configs.find(h => h.id === current.hotel_id)
+      const hotel = await configService.getHotel(current.hotel_id)
       if (hotel) {
         hotel_context = {
           hotel_id: hotel.id,
