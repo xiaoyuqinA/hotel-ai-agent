@@ -231,8 +231,8 @@ async function handleGenerateReply(payload, tabId) {
     sseManager.connect(run_id, {
       apiUrl,
       lastSequence: 0,
-      retry: false,
-      maxRetry: 0,
+      retry: true,
+      maxRetry: 3,
       onEvent: (event) => {
         eventRouter.route(event, targetTabId)
       },

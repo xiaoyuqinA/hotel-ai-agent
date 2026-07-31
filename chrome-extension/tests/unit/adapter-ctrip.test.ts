@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 /**
  * OTA Adapter 单元测试
  *

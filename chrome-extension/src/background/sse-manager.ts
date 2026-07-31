@@ -153,13 +153,28 @@ class SSEManager {
 
     // 错误处理
     connection.eventSource.onerror = (error) => {
-      console.error('[SSEManager] SSE error:', runId, error)
+      console.error('[SSEManager] SSE error:', runId, 'type:', error?.type, 'event:', JSON.stringify({type: error?.type, eventPhase: (error as any)?.eventPhase, timeStamp: (error as any)?.timeStamp}))
 
-      // 已完成/主动断开后 EventSource 仍可能触发 error，忽略
+      // EventSource 内置超时（约 30 秒无数据）会触发 onerror。
+      // 如果已经收到过事件（retryCount == 0），说明流是通的，忽略此 error
+      // 只在连续 error 时才需要处理
       if (
         !this._connections[runId] ||
         connection.status === ConnectionStatus.DISCONNECTED
       ) {
+        return
+      }
+
+      // 首次 error（已收到过事件）大概率是空闲超时，自动重连
+      if (connection.retryCount < connection.maxRetry) {
+        console.log('[SSEManager] SSE idle timeout, reconnecting:', runId)
+        connection.status = ConnectionStatus.RECONNECTING
+        this._notifyStatusChange(runId)
+        if (connection.eventSource) {
+          connection.eventSource.close()
+          connection.eventSource = null
+        }
+        this._scheduleReconnect(runId)
         return
       }
 

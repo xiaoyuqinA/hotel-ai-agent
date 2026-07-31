@@ -8,6 +8,7 @@ GET /review/stream/{run_id}
 """
 
 import asyncio
+import time
 import uuid
 from typing import Any
 
@@ -188,8 +189,24 @@ async def stream_review_run(request: Request, run_id: str) -> Response:
     last_sequence = int(request.query_params.get("last_sequence", 0))
 
     async def event_generator():
-        async for event in subscribe_with_history(run_id, last_sequence):
-            yield format_sse_event(event)
+        HEARTBEAT_INTERVAL = 15
+
+        event_iter = subscribe_with_history(run_id, last_sequence)
+
+        while True:
+            # 同时等真实事件和 15 秒心跳
+            try:
+                event = await asyncio.wait_for(
+                    event_iter.__anext__(),
+                    timeout=HEARTBEAT_INTERVAL,
+                )
+                yield format_sse_event(event)
+            except asyncio.TimeoutError:
+                # 15 秒没收到事件，发心跳
+                yield ": heartbeat\n\n"
+            except StopAsyncIteration:
+                # 事件流结束，关闭 SSE
+                return
 
     return StreamingResponse(
         event_generator(),
