@@ -4,35 +4,17 @@ import secrets
 import string
 from datetime import datetime, timezone, timedelta
 
-import os
-
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
-import asyncpg
+from shared.invite.service import get_connection, validate_invite_code
 
 app = FastAPI(title="Hotel AI Admin")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-POSTGRES_DSN = (
-    f"postgresql://{os.getenv('POSTGRES_USER', 'postgres')}"
-    f":{os.getenv('POSTGRES_PASSWORD', 'postgres')}"
-    f"@{os.getenv('POSTGRES_HOST', 'postgres')}"
-    f":{os.getenv('POSTGRES_PORT', '5432')}"
-    f"/{os.getenv('POSTGRES_DB', 'hotel_ai')}"
-)
-
-
-async def get_db():
-    if os.getenv("ADMIN_TEST_MODE"):
-        from unittest.mock import AsyncMock
-        mock = AsyncMock()
-        mock.fetch = AsyncMock(return_value=[])
-        mock.execute = AsyncMock(return_value=None)
-        return mock
-    return await asyncpg.connect(POSTGRES_DSN)
+get_db = get_connection  # 别名，保持已有代码兼容
 
 
 def generate_code(length=12) -> str:

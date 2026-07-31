@@ -15,6 +15,18 @@ POSTGRES_DSN = (
 )
 
 
+async def get_connection():
+    """获取数据库连接。"""
+    test_mode = os.getenv("ADMIN_TEST_MODE")
+    if test_mode:
+        from unittest.mock import AsyncMock
+        mock = AsyncMock()
+        mock.fetch = AsyncMock(return_value=[])
+        mock.execute = AsyncMock(return_value=None)
+        return mock
+    return await asyncpg.connect(POSTGRES_DSN)
+
+
 async def validate_invite_code(code: str) -> tuple[bool, str]:
     """验证邀请码有效性。
 
