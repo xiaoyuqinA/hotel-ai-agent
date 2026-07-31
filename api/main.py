@@ -12,11 +12,20 @@ from shared.runtime.workflow_runtime import WorkflowRuntime
 
 # ── 日志配置 ──────────────────────────────────────────────────────────────────
 
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    format=LOG_FORMAT,
+    datefmt=LOG_DATE_FORMAT,
 )
+
+# 覆写 Uvicorn 的 access log 格式
+for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+    uvicorn_logger = logging.getLogger(name)
+    for handler in uvicorn_logger.handlers:
+        handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
 
 logger = logging.getLogger("hotel_ai")
 
