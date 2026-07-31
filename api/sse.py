@@ -195,10 +195,13 @@ async def stream_review_run(request: Request, run_id: str) -> Response:
     async def event_generator():
         HEARTBEAT_INTERVAL = 15
 
+        # Chrome EventSource 在收到最后一个 data: 后约 2 秒会触发 onerror。
+        # 必须在订阅事件流之前立即发一个注释行，重置计时器。
+        yield ": connected\n\n"
+
         event_iter = subscribe_with_history(run_id, last_sequence)
 
         while True:
-            # 同时等真实事件和 15 秒心跳
             try:
                 event = await asyncio.wait_for(
                     event_iter.__anext__(),
@@ -206,10 +209,8 @@ async def stream_review_run(request: Request, run_id: str) -> Response:
                 )
                 yield format_sse_event(event)
             except asyncio.TimeoutError:
-                # 15 秒没收到事件，发心跳
                 yield ": heartbeat\n\n"
             except StopAsyncIteration:
-                # 事件流结束，关闭 SSE
                 return
 
     return StreamingResponse(
