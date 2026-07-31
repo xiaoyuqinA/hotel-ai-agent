@@ -53,6 +53,25 @@ services:
     networks:
       - hotel_ai_net
 
+  admin:
+    build: ./admin
+    container_name: hotel_ai_admin
+    logging: *logging-config
+    ports:
+      - "8001:8001"
+    environment:
+      <<: *timezone
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hotel_ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hotel_ai_net
+
   api:
     image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:linux-amd64
     container_name: hotel_ai_api

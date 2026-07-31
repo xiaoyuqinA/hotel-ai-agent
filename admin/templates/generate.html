@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成邀请码</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 24px; }
+        .container { max-width: 500px; margin: 0 auto; }
+        h1 { font-size: 22px; margin-bottom: 16px; }
+        .card { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 14px; color: #555; margin-bottom: 4px; }
+        input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        input:focus { outline: none; border-color: #1a73e8; }
+        .btn { display: inline-block; padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; text-decoration: none; border: none; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-secondary { background: #f1f3f4; color: #333; margin-left: 8px; }
+        .actions { display: flex; align-items: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>生成邀请码</h1>
+        <div class="card">
+            <form method="post" action="/generate">
+                <div class="form-group">
+                    <label>酒店名称 / ID（可选）</label>
+                    <input name="hotel_id" placeholder="例如：深圳湾万豪酒店">
+                </div>
+                <div class="form-group">
+                    <label>用户名称（可选）</label>
+                    <input name="user_name" placeholder="例如：张经理">
+                </div>
+                <div class="form-group">
+                    <label>有效期（天）</label>
+                    <input name="days" type="number" value="7" min="1" max="365">
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary">生成</button>
+                    <a href="/" class="btn btn-secondary">返回</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
