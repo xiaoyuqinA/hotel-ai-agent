@@ -1,4 +1,7 @@
 """Generate Reply Node — 生成回复，发送业务事件。"""
+import logging
+logger = logging.getLogger("hotel_ai")
+
 
 from langgraph.config import get_stream_writer
 
@@ -35,8 +38,8 @@ async def generate_reply_node(state: ReviewReplyState) -> ReviewReplyState:
         # hotel_context 可选：无 hotel_id 时为 None，Agent 使用默认配置
 
         input_text = ReplyInputMapper.map(state)
-        print(f"[GenerateReply] hotel_context present: {hotel_context is not None}")
-        print(f"[GenerateReply] Agent input JSON (first 500 chars):\n{input_text[:500]}")
+        logger.info("hotel_context present: %s", hotel_context is not None)
+        logger.info("Agent input JSON (first 500 chars):\n%s", input_text[:500])
 
         reply_content = ""
         async for event_type, chunk in stream_agent_with_events(

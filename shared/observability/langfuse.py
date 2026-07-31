@@ -1,4 +1,7 @@
 """Langfuse 初始化 — OpenAI Agents SDK 自动追踪入口。"""
+import logging
+logger = logging.getLogger("hotel_ai")
+
 
 import config.settings  # 确保 .env 被 load_dotenv 加载
 from openinference.instrumentation.openai_agents import (
@@ -23,8 +26,8 @@ def init_langfuse():
     langfuse = get_client()
 
     if langfuse.auth_check():
-        print("Langfuse connected")
+        logger.info("Langfuse connected")
     else:
-        print("Langfuse authentication failed")
+        logger.info("Langfuse authentication failed")
 
     _initialized = True

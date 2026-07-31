@@ -1,4 +1,7 @@
 """ReplyInputMapper — 构建 Agent 输入 JSON。"""
+import logging
+logger = logging.getLogger("hotel_ai")
+
 
 import json
 from dataclasses import asdict, dataclass
@@ -36,5 +39,5 @@ class ReplyInputMapper:
             "analysis": analysis_data,
             "hotel_context": ctx,
         }
-        print(f"[ReplyInputMapper] Full Agent input JSON:\n{json.dumps(result, ensure_ascii=False, default=str)}")
+        logger.info("Full Agent input JSON:\n%s", json.dumps(result, ensure_ascii=False, default=str))
         return json.dumps(result, ensure_ascii=False, default=str)

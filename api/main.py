@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
         await init_db()
         app.state.event_store_initialized = True
     except Exception as e:
-        print(f"Warning: Event Store not available (PostgreSQL/Redis): {e}")
+        logger.warning("Event Store not available (PostgreSQL/Redis): %s", e)
         app.state.event_store_initialized = False
 
     yield

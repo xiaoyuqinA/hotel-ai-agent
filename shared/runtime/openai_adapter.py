@@ -1,4 +1,7 @@
 """OpenAI Agents SDK adapter — wraps Runner.run / Runner.run_streamed."""
+import logging
+logger = logging.getLogger("hotel_ai")
+
 
 import json
 from typing import AsyncGenerator
@@ -11,17 +14,17 @@ class OpenAIAdapter:
     """Runtime adapter for the OpenAI Agents SDK."""
 
     async def run(self, agent: object, user_input: str, session: object | None = None) -> str:
-        print(f"[OpenAIAdapter.run] Agent: {getattr(agent, 'name', 'unknown')}")
-        print(f"[OpenAIAdapter.run] User input:\n{user_input}")
+        logger.info("Agent: %s", getattr(agent, "name", "unknown"))
+        logger.info("User input:\n%s", user_input)
         result = await Runner.run(agent, user_input, session=session)
         return result.final_output
 
     async def stream(
         self, agent: object, user_input: str, session: object | None = None,
     ) -> AsyncGenerator[str, None]:
-        print(f"[OpenAIAdapter.stream] Agent: {getattr(agent, 'name', 'unknown')}")
-        print(f"[OpenAIAdapter.stream] System prompt:\n{getattr(agent, 'instructions', '(none)')}")
-        print(f"[OpenAIAdapter.stream] User input:\n{user_input}")
+        logger.info("Agent: %s", getattr(agent, "name", "unknown"))
+        logger.info("System prompt:\n%s", getattr(agent, "instructions", "(none)"))
+        logger.info("User input:\n%s", user_input)
         result = Runner.run_streamed(agent, input=user_input, session=session)
 
         async for event in result.stream_events():
