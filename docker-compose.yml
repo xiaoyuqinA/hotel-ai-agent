@@ -4,6 +4,11 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: hotel_ai_postgres
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -24,6 +29,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: hotel_ai_redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "30"
     ports:
       - "6380:6379"
     volumes:
