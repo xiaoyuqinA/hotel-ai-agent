@@ -2,10 +2,13 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY admin/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY admin/app.py .
+COPY admin/templates/ templates/
+COPY admin/__init__.py .
+COPY shared/ shared/
 
 EXPOSE 8001
 

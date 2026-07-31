@@ -54,6 +54,9 @@ services:
       - hotel_ai_net
 
   admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
     image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-admin:linux-arm64
     container_name: hotel_ai_admin
     logging: *logging-config
