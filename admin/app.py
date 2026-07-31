@@ -26,6 +26,12 @@ POSTGRES_DSN = (
 
 
 async def get_db():
+    if os.getenv("ADMIN_TEST_MODE"):
+        from unittest.mock import AsyncMock
+        mock = AsyncMock()
+        mock.fetch = AsyncMock(return_value=[])
+        mock.execute = AsyncMock(return_value=None)
+        return mock
     return await asyncpg.connect(POSTGRES_DSN)
 
 
