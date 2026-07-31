@@ -49,7 +49,7 @@ async function render() {
 
 // ── 视图 0：邀请码 ─────────────────────────────────────────────────────────
 
-function renderInviteCode(errorMsg?: string) {
+function renderInviteCode() {
   contentEl.innerHTML = `
     <div class="section">
       <div class="label">🔑 邀请码</div>
@@ -57,12 +57,10 @@ function renderInviteCode(errorMsg?: string) {
         请输入商家邀请码开始使用
       </p>
       <input class="input" id="invite-code-input"
-             placeholder="例如：INVITE-XXXX"
-             style="margin-bottom:12px;" />
+             placeholder="INVITE-XXXX"
+             style="margin-bottom:8px;" />
       <button class="btn btn-primary" id="verify-invite-btn">验证</button>
-      <div id="invite-status" class="status-text ${errorMsg ? 'error' : ''}">
-        ${errorMsg || ''}
-      </div>
+      <div id="invite-status" class="status-text"></div>
     </div>
   `;
 
@@ -70,6 +68,7 @@ function renderInviteCode(errorMsg?: string) {
   document.getElementById('invite-code-input')!.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') onVerifyInvite();
   });
+  document.getElementById('invite-code-input')!.focus();
 }
 
 async function onVerifyInvite() {
@@ -80,9 +79,10 @@ async function onVerifyInvite() {
     return;
   }
 
+  showStatus('invite-status', '验证中...', '');
   const btn = document.getElementById('verify-invite-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = '验证中...';
+  btn.textContent = '验证中';
 
   try {
     const result = await inviteCodeService.validate(code);
