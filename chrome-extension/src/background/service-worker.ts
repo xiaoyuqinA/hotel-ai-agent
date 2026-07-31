@@ -145,6 +145,9 @@ async function handleMessage(message, sender) {
     case 'PING':
       return { pong: true }
 
+    case 'CHECK_INVITE':
+      return await handleCheckInvite()
+
     case 'GENERATE_REPLY':
       return await handleGenerateReply(payload, sender.tab?.id)
 
@@ -220,7 +223,19 @@ async function handleGenerateReply(payload, tabId) {
     if (!response.ok) {
       const errBody = await response.text().catch(() => '')
       console.error('[ServiceWorker] POST /review/run failed:', response.status, errBody)
-      throw new Error(`Failed to create run: ${response.statusText}`)
+      // 解析后端返回的错误详情
+      let errorMsg = `请求失败 (${response.status})`
+      try {
+        const errData = JSON.parse(errBody)
+        if (errData.detail) errorMsg = errData.detail
+      } catch {}
+      // 发送 WORKFLOW_ERROR 给 Content Script 显示错误
+      eventRouter.route({
+        category: 'system',
+        kind: 'workflow_failed',
+        payload: { error: errorMsg },
+      }, targetTabId)
+      return { error: errorMsg }
     }
 
     const result = await response.json()
@@ -267,6 +282,18 @@ async function handleGenerateReply(payload, tabId) {
       throw new Error(data.detail || error.message)
     }
     throw error
+  }
+}
+
+/**
+ * 检查邀请码是否存在
+ */
+async function handleCheckInvite() {
+  try {
+    const result = await chrome.storage.local.get('invite_code')
+    return { hasInvite: !!result['invite_code'] }
+  } catch {
+    return { hasInvite: false }
   }
 }
 

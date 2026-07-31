@@ -409,6 +409,21 @@ async function onGenerate() {
   }
 
   _currentReview = review;
+
+  // 检查邀请码
+  try {
+    const inviteResp = await chrome.runtime.sendMessage({ type: 'CHECK_INVITE' }).catch(() => ({ hasInvite: false }));
+    if (!inviteResp?.hasInvite) {
+      store.setError('请先在扩展中设置邀请码');
+      setPanelView('error');
+      return;
+    }
+  } catch {
+    store.setError('请先在扩展中设置邀请码');
+    setPanelView('error');
+    return;
+  }
+
   store.startRun(null);
   setPanelView('running');
   setFABState('generating');
