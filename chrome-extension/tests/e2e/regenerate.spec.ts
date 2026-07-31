@@ -143,19 +143,16 @@ test.describe('重新生成 E2E', () => {
       expect(firstReply).toBeTruthy()
       expect(firstReply.length).toBeGreaterThan(0)
 
-      // 确认编辑和发布按钮可见
+      // 确认编辑和复制按钮可见
       await expect(panel.locator('#ha-edit-btn')).toBeVisible()
-      await expect(panel.locator('#ha-publish-btn')).toBeVisible()
+      await expect(panel.locator('#ha-copy-btn')).toBeVisible()
 
       // ── Step 5: 点击重新生成按钮 ────────────────────────────────────────────
       const retryBtn = panel.locator('#ha-retry-btn')
       await expect(retryBtn).toBeVisible()
       await retryBtn.click()
 
-      // 面板应切回 idle/view，重新选中文本前可能先到 idle
-      // 然后用户需再次选中文本或 panel 自动进入 idle
-      // 实际代码中 retryBtn 触发的 onGenerate 会检查是否有 review
-      // 已经选中文本会直接发送请求
+      // panel 切换到 running
       console.log('[Test] Retry clicked')
 
       // Step 6: 验证第二次生成
@@ -166,9 +163,6 @@ test.describe('重新生成 E2E', () => {
       console.log('[Test] Second reply:', secondReply)
       expect(secondReply).toBeTruthy()
       expect(secondReply.length).toBeGreaterThan(0)
-
-      // 第二次回复应与第一次不同（或至少流程完整）
-      // 不强制要求不同内容，但至少成功生成
 
       console.log('[Test] Regenerate flow completed successfully')
 
