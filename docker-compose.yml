@@ -1,14 +1,17 @@
 version: "3.9"
 
+x-logging:
+  &logging-config
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "30"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: hotel_ai_postgres
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "30"
+    logging: *logging-config
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -29,11 +32,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: hotel_ai_redis
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "30"
+    logging: *logging-config
     ports:
       - "6380:6379"
     volumes:
@@ -49,6 +48,7 @@ services:
   api:
     image: crpi-vwwvimdqz0exguce.cn-shenzhen.personal.cr.aliyuncs.com/hotel-ai/hotel-ai-backend:linux-amd64
     container_name: hotel_ai_api
+    logging: *logging-config
     ports:
       - "8000:8000"
     environment:
