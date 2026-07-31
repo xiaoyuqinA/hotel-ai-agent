@@ -12,7 +12,6 @@
 import { LocalHotelConfigRepository } from '../config/local_repository.js';
 import { HotelConfigService } from '../config/service.js';
 import { inviteCodeService } from '../config/invite_service.js';
-import { ChromeStorage } from '../storage/chrome_storage.js';
 import type { CurrentHotel, HotelConfig, ReplySettings } from '../config/models.js';
 import { DEFAULT_REPLY_SETTINGS } from '../config/models.js';
 
@@ -24,16 +23,11 @@ const configService = new HotelConfigService(new LocalHotelConfigRepository());
 
 let contentEl: HTMLElement;
 
-// ── 路由 ─────────────────────────────────────────────────────────────────────
-
-const INVITE_CODE_KEY = 'invite_code';
-
 async function render() {
   contentEl = document.getElementById('app-content')!;
 
   // 1. 检查邀请码
-  const storage = new ChromeStorage();
-  const inviteCode = await storage.get<string>(INVITE_CODE_KEY);
+  const inviteCode = await inviteCodeService.get();
   if (!inviteCode) {
     return renderInviteCode();
   }
@@ -87,8 +81,7 @@ async function onVerifyInvite() {
   try {
     const result = await inviteCodeService.validate(code);
     if (result.valid) {
-      const storage = new ChromeStorage();
-      await storage.set(INVITE_CODE_KEY, code);
+      await inviteCodeService.set(code);
       await render();
     } else {
       showStatus('invite-status', result.message || '邀请码无效', 'error');
@@ -206,8 +199,7 @@ async function renderHotelHome(current: CurrentHotel) {
 async function loadInviteCode() {
   const el = document.getElementById('invite-code-text');
   if (!el) return;
-  const storage = new ChromeStorage();
-  const code = await storage.get<string>(INVITE_CODE_KEY);
+  const code = await inviteCodeService.get();
   el.textContent = code || '未设置';
 }
 
@@ -253,8 +245,7 @@ async function onSaveInviteCode() {
   try {
     const result = await inviteCodeService.validate(code);
     if (result.valid) {
-      const storage = new ChromeStorage();
-      await storage.set(INVITE_CODE_KEY, code);
+      await inviteCodeService.set(code);
       showStatus('edit-invite-status', '✅ 邀请码已更新', 'success');
       setTimeout(() => render(), 1200);
     } else {
