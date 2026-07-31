@@ -15,6 +15,7 @@ services:
     image: postgres:16-alpine
     container_name: hotel_ai_postgres
     logging: *logging-config
+    command: postgres -c log_timezone=Asia/Shanghai -c timezone=Asia/Shanghai
     environment:
       <<: *timezone
       PGTZ: Asia/Shanghai
