@@ -10,14 +10,25 @@ GET /review/stream/{run_id}
 import asyncio
 import json as _json
 import logging
+import os
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Any
 
+import asyncpg
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import Response, StreamingResponse
 
 logger = logging.getLogger("hotel_ai")
+
+POSTGRES_DSN = (
+    f"postgresql://{os.getenv('POSTGRES_USER', 'postgres')}"
+    f":{os.getenv('POSTGRES_PASSWORD', 'postgres')}"
+    f"@{os.getenv('POSTGRES_HOST', 'postgres')}"
+    f":{os.getenv('POSTGRES_PORT', '5432')}"
+    f"/{os.getenv('POSTGRES_DB', 'hotel_ai')}"
+)
 
 from shared.workflow_events.models import (
     WorkflowEvent,
@@ -122,6 +133,33 @@ async def create_review_run(request: Request) -> dict:
 
     import json as _json
     logger.info("POST /review/run request: %s", _json.dumps(body, ensure_ascii=False, default=str))
+
+    # 验证邀请码
+    invite_code = body.get("invite_code")
+    if not invite_code:
+        raise HTTPException(status_code=403, detail="邀请码不能为空")
+    try:
+        conn = await asyncpg.connect(POSTGRES_DSN)
+        row = await conn.fetchrow(
+            "SELECT is_active, expires_at FROM invite_codes WHERE code = $1",
+            invite_code,
+        )
+        if not row:
+            raise HTTPException(status_code=403, detail="邀请码不存在")
+        if not row["is_active"]:
+            raise HTTPException(status_code=403, detail="邀请码已停用")
+        if row["expires_at"] < datetime.now(timezone.utc):
+            raise HTTPException(status_code=403, detail="邀请码已过期")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("邀请码验证失败: %s", e)
+        raise HTTPException(status_code=500, detail="邀请码验证服务异常")
+    finally:
+        try:
+            await conn.close()
+        except Exception:
+            pass
 
     runtime = request.app.state.runtime
     workflow = runtime.get_workflow("review_operation")
