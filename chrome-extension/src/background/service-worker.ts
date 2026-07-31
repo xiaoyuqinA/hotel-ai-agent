@@ -173,10 +173,12 @@ async function handleGenerateReply(payload, tabId) {
 
   // Service Worker 自己从 chrome.storage.local 读取 hotel 配置
   let hotel_context = null
+  let invite_code = null
   try {
-    const storageResult = await chrome.storage.local.get(['current_hotel', 'hotel_configs'])
+    const storageResult = await chrome.storage.local.get(['current_hotel', 'hotel_configs', 'invite_code'])
     const current = storageResult['current_hotel']
     const configs = storageResult['hotel_configs'] || []
+    invite_code = storageResult['invite_code'] || null
     if (current) {
       const hotel = configs.find(h => h.id === current.hotel_id)
       if (hotel) {
@@ -204,7 +206,7 @@ async function handleGenerateReply(payload, tabId) {
 
   try {
     // 1. 创建 workflow run（直接用 fetch，不用 client）
-    const body = JSON.stringify({ reviews_content: review, hotel_context })
+    const body = JSON.stringify({ reviews_content: review, hotel_context, invite_code })
     console.log('[ServiceWorker] POST /review/run request body:', body)
     const response = await fetch(`${apiUrl}/review/run`, {
       method: 'POST',

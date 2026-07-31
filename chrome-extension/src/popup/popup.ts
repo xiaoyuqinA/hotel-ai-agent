@@ -11,6 +11,8 @@
 
 import { LocalHotelConfigRepository } from '../config/local_repository.js';
 import { HotelConfigService } from '../config/service.js';
+import { inviteCodeService } from '../config/invite_service.js';
+import { ChromeStorage } from '../storage/chrome_storage.js';
 import type { CurrentHotel, HotelConfig, ReplySettings } from '../config/models.js';
 import { DEFAULT_REPLY_SETTINGS } from '../config/models.js';
 
@@ -24,15 +26,80 @@ let contentEl: HTMLElement;
 
 // ── 路由 ─────────────────────────────────────────────────────────────────────
 
+const INVITE_CODE_KEY = 'invite_code';
+
 async function render() {
   contentEl = document.getElementById('app-content')!;
 
+  // 1. 检查邀请码
+  const storage = new ChromeStorage();
+  const inviteCode = await storage.get<string>(INVITE_CODE_KEY);
+  if (!inviteCode) {
+    return renderInviteCode();
+  }
+
+  // 2. 检查酒店
   const current = await configService.getCurrentHotel();
   if (!current) {
     return renderCreateHotel();
   }
 
   return renderHotelHome(current);
+}
+
+// ── 视图 0：邀请码 ─────────────────────────────────────────────────────────
+
+function renderInviteCode(errorMsg?: string) {
+  contentEl.innerHTML = `
+    <div class="section">
+      <div class="label">🔑 邀请码</div>
+      <p style="font-size:13px;color:#666;margin-bottom:12px;">
+        请输入商家邀请码开始使用
+      </p>
+      <input class="input" id="invite-code-input"
+             placeholder="例如：INVITE-XXXX"
+             style="margin-bottom:12px;" />
+      <button class="btn btn-primary" id="verify-invite-btn">验证</button>
+      <div id="invite-status" class="status-text ${errorMsg ? 'error' : ''}">
+        ${errorMsg || ''}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('verify-invite-btn')!.addEventListener('click', onVerifyInvite);
+  document.getElementById('invite-code-input')!.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') onVerifyInvite();
+  });
+}
+
+async function onVerifyInvite() {
+  const input = document.getElementById('invite-code-input') as HTMLInputElement;
+  const code = input.value.trim();
+  if (!code) {
+    showStatus('invite-status', '请输入邀请码', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('verify-invite-btn') as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+
+  try {
+    const result = await inviteCodeService.validate(code);
+    if (result.valid) {
+      const storage = new ChromeStorage();
+      await storage.set(INVITE_CODE_KEY, code);
+      await render();
+    } else {
+      showStatus('invite-status', result.message || '邀请码无效', 'error');
+      btn.disabled = false;
+      btn.textContent = '验证';
+    }
+  } catch {
+    showStatus('invite-status', '验证失败，请稍后重试', 'error');
+    btn.disabled = false;
+    btn.textContent = '验证';
+  }
 }
 
 // ── 视图 1：创建酒店 ─────────────────────────────────────────────────────────
@@ -117,12 +184,89 @@ async function renderHotelHome(current: CurrentHotel) {
         ✎ 编辑回复设置
       </button>
     </div>
+
+    <div class="section" id="invite-code-section">
+      <div class="label">🔑 邀请码</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+        <span id="invite-code-text" style="font-size:13px;color:#999;">加载中...</span>
+        <button class="btn btn-secondary" id="change-invite-btn"
+                style="width:auto;padding:4px 10px;font-size:12px;">更换</button>
+      </div>
+    </div>
   `;
 
   loadSettingsPreview(current.hotel_id);
+  loadInviteCode();
 
   document.getElementById('hotel-selector-btn')!.addEventListener('click', onShowHotelList);
   document.getElementById('edit-settings-btn')!.addEventListener('click', () => renderEditSettings(current));
+  document.getElementById('change-invite-btn')!.addEventListener('click', renderInviteCodeInput);
+}
+
+async function loadInviteCode() {
+  const el = document.getElementById('invite-code-text');
+  if (!el) return;
+  const storage = new ChromeStorage();
+  const code = await storage.get<string>(INVITE_CODE_KEY);
+  el.textContent = code || '未设置';
+}
+
+function renderInviteCodeInput() {
+  contentEl.innerHTML = `
+    <div class="section">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <button class="btn btn-secondary" id="back-btn"
+                style="width:auto;padding:6px 14px;font-size:13px;">← 返回</button>
+        <span style="font-weight:500;">修改邀请码</span>
+      </div>
+    </div>
+    <div class="section">
+      <div class="label">邀请码</div>
+      <input class="input" id="edit-invite-input"
+             placeholder="输入新邀请码"
+             style="margin-bottom:12px;" />
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="cancel-invite-btn">取消</button>
+        <button class="btn btn-primary" id="save-invite-btn">保存</button>
+      </div>
+      <div id="edit-invite-status" class="status-text hidden"></div>
+    </div>
+  `;
+
+  document.getElementById('back-btn')!.addEventListener('click', () => render());
+  document.getElementById('cancel-invite-btn')!.addEventListener('click', () => render());
+  document.getElementById('save-invite-btn')!.addEventListener('click', onSaveInviteCode);
+}
+
+async function onSaveInviteCode() {
+  const input = document.getElementById('edit-invite-input') as HTMLInputElement;
+  const code = input.value.trim();
+  if (!code) {
+    showStatus('edit-invite-status', '请输入邀请码', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('save-invite-btn') as HTMLButtonElement;
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+
+  try {
+    const result = await inviteCodeService.validate(code);
+    if (result.valid) {
+      const storage = new ChromeStorage();
+      await storage.set(INVITE_CODE_KEY, code);
+      showStatus('edit-invite-status', '✅ 邀请码已更新', 'success');
+      setTimeout(() => render(), 1200);
+    } else {
+      showStatus('edit-invite-status', result.message || '邀请码无效', 'error');
+      btn.disabled = false;
+      btn.textContent = '保存';
+    }
+  } catch {
+    showStatus('edit-invite-status', '验证失败', 'error');
+    btn.disabled = false;
+    btn.textContent = '保存';
+  }
 }
 
 async function loadSettingsPreview(hotelId: string) {
