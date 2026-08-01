@@ -39,7 +39,7 @@ export class InviteCodeService {
   async validate(code: string): Promise<{ valid: boolean; message?: string }> {
     try {
       const apiUrl = await this._getApiUrl();
-      const resp = await fetch(`${apiUrl}/api/invite/validate`, {
+      const resp = await fetch(`${apiUrl}/review/invite/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),

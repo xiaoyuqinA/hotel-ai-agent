@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import { resolve } from "path";
-import { copyFileSync, existsSync, mkdirSync, cpSync } from "fs";
+import { copyFileSync, existsSync, mkdirSync, cpSync, readdirSync } from "fs";
 
 const ROOT = resolve(import.meta.url ? new URL(".", import.meta.url).pathname : ".");
 const PUBLIC = resolve(ROOT, "public");
@@ -26,6 +26,16 @@ function copyStaticAssets() {
       if (existsSync(popupHtmlSrc)) {
         if (!existsSync(resolve(DIST, "popup"))) mkdirSync(resolve(DIST, "popup"), { recursive: true });
         copyFileSync(popupHtmlSrc, popupHtmlDst);
+      }
+
+      // 复制 assets 到 popup 目录（popup.js 中的 import 需要找到 chunks）
+      const assetsSrc = resolve(DIST, "assets");
+      const assetsDst = resolve(DIST, "popup", "assets");
+      if (existsSync(assetsSrc)) {
+        if (!existsSync(assetsDst)) mkdirSync(assetsDst, { recursive: true });
+        for (const file of readdirSync(assetsSrc)) {
+          copyFileSync(resolve(assetsSrc, file), resolve(assetsDst, file));
+        }
       }
 
       const stylesSrc = resolve(ROOT, "src", "content-script", "styles.css");
@@ -54,12 +64,9 @@ export default defineConfig(({ mode }) => {
       outDir: DIST,
       emptyOutDir: true,
       rollupOptions: {
-        input: {
-          background: resolve(ROOT, "src/background/service-worker.ts"),
-          popup: resolve(ROOT, "src/popup/popup.ts"),
-        },
+        input: resolve(ROOT, "src/background/service-worker.ts"),
         output: {
-          entryFileNames: "[name].js",
+          entryFileNames: "background.js",
           chunkFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash][extname]",
         },
@@ -67,7 +74,35 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       copyStaticAssets(),
-      // 第二阶段：单独构建 contentScript
+      // 第二阶段：单独构建 popup（IIFE，自包含无 import）
+      {
+        name: "build-popup",
+        async closeBundle() {
+          const { build } = await import("vite");
+          await build({
+            configFile: false,
+            root: ROOT,
+            define: {
+              'import.meta.env.VITE_API_URL': apiUrl,
+            },
+            build: {
+              outDir: DIST,
+              emptyOutDir: false,
+              rollupOptions: {
+                input: resolve(ROOT, "src/popup/popup.ts"),
+                output: {
+                  entryFileNames: "popup.js",
+                  format: "iife",
+                },
+              },
+            },
+          });
+
+          // 不再内联 popup.js，通过 <script src="../popup.js"> 外部加载
+          // 由 popup/index.html 中的脚本标签引用 IIFE 打包的 popup.js
+        },
+      },
+      // 第三阶段：单独构建 contentScript（IIFE）
       {
         name: "build-content-script",
         async closeBundle() {

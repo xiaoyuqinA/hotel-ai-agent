@@ -32,7 +32,7 @@ async function render() {
     return renderInviteCode();
   }
 
-  // 2. 检查酒店
+  // 2. 有邀请码 → 走原有酒店逻辑
   const current = await configService.getCurrentHotel();
   if (!current) {
     return renderCreateHotel();

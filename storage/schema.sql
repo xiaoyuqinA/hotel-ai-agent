@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS workflow_events (
     PRIMARY KEY (workflow_id, sequence)
 );
 
--- 索引：按 workflow_id 快速查询 + 断线恢复
 CREATE INDEX idx_workflow_events_workflow_id ON workflow_events(workflow_id);
 CREATE INDEX idx_workflow_events_sequence ON workflow_events(workflow_id, sequence);
 CREATE INDEX idx_workflow_events_created_at ON workflow_events(created_at);
@@ -47,3 +46,22 @@ CREATE INDEX idx_workflow_events_created_at ON workflow_events(created_at);
 COMMENT ON TABLE workflow_events IS 'Event Sourcing store for workflow events';
 COMMENT ON COLUMN workflow_events.workflow_id IS 'References workflow_runs.id';
 COMMENT ON COLUMN workflow_events.sequence IS 'Monotonically increasing sequence (like Kafka offset)';
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- invite_codes 表：邀请码
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+    code VARCHAR(32) PRIMARY KEY,
+    hotel_id VARCHAR(64),
+    user_name VARCHAR(128),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_invite_codes_expires ON invite_codes(expires_at);
+CREATE INDEX idx_invite_codes_active ON invite_codes(is_active);
+
+COMMENT ON TABLE invite_codes IS '商家邀请码，有效期 7 天';
+COMMENT ON COLUMN invite_codes.expires_at IS '过期时间，到期后自动失效';
