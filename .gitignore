@@ -22,3 +22,4 @@ chrome-extension/.vite-temp/
 
 # OS
 .DS_Store
+storage/langgraph_checkpoints.db
