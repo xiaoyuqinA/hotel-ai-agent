@@ -22,8 +22,12 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*/*",
-        "http://*/*"
+        "https://*.ctrip.com/*",
+        "https://*.fliggy.com/*",
+        "https://*.booking.com/*",
+        "https://*.agoda.com/*",
+        "https://*.tujia.com/*",
+        "http://hotel.ai.love-llm.xin/*"
       ],
       "js": ["contentScript.js"],
       "css": ["styles.css"],
@@ -32,7 +36,14 @@
   ],
   "web_accessible_resources": [{
     "resources": ["popup.js", "assets/*"],
-    "matches": ["<all_urls>"]
+    "matches": [
+      "https://*.ctrip.com/*",
+      "https://*.fliggy.com/*",
+      "https://*.booking.com/*",
+      "https://*.agoda.com/*",
+      "https://*.tujia.com/*",
+      "http://hotel.ai.love-llm.xin/*"
+    ]
   }],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
