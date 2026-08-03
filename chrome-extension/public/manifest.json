@@ -8,7 +8,7 @@
     "storage"
   ],
   "host_permissions": [
-    "http://localhost:8000/*",
+    "http://hotel.ai.love-llm.xin/*",
     "https://*.ctrip.com/*",
     "https://*.fliggy.com/*",
     "https://*.booking.com/*",
