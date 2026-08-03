@@ -77,10 +77,19 @@ app.include_router(sse_router)
 app.include_router(hotel_config_router)
 app.state.runtime = _runtime
 
-# 静态文件（隐私政策等）
+# 静态文件（官网、隐私政策、扩展下载包等）
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """官网首页。"""
+    return FileResponse(str(STATIC_DIR / "index.html"))
+
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
