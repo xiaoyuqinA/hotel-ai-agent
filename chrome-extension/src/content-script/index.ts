@@ -15,7 +15,7 @@ import type { OTAAdapter } from './adapters/types.js';
 import { detectAdapter } from './adapters/registry.js';
 import { LocalHotelConfigRepository } from '../config/local_repository.js';
 import { HotelConfigService } from '../config/service.js';
-import { initI18n, setCurrentLang, normalizeLang, t } from '../i18n/index.js';
+import { initI18n, t } from '../i18n/index.js';
 
 const store = createStore();
 const configService = new HotelConfigService(new LocalHotelConfigRepository());
@@ -60,19 +60,9 @@ async function _ensureRuntimeReady(maxRetries = 10, interval = 500): Promise<boo
 }
 
 async function init() {
-  // 初始化语言（storage → 浏览器检测），确保就绪后再注册消息监听，
+  // 初始化语言（依据浏览器语言），确保就绪后再注册消息监听，
   // 避免 WORKFLOW_STARTED 等消息到达时 _currentLang 仍是默认 zh。
   await initI18n();
-
-  // 语言切换（popup 修改 storage 时同步）
-  try {
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes['app_lang']) {
-        setCurrentLang(normalizeLang(changes['app_lang'].newValue));
-        if (panel) renderCurrentView();
-      }
-    });
-  } catch { /* storage listener 不可用时忽略 */ }
 
   // 注册消息监听
   chrome.runtime.onMessage.addListener(handleMessage);

@@ -2,16 +2,14 @@
  * i18n 语言管理
  *
  * 职责：
- * 1. 读取/写入当前语言（chrome.storage.local['app_lang']）
- * 2. 未设置时自动检测浏览器语言（navigator.language）
- * 3. 提供 t(key) 翻译函数，缺失时回退中文
+ * 1. 根据浏览器语言（navigator.language）自动检测界面语言
+ * 2. 提供 t(key) 翻译函数，缺失时回退中文
  *
- * 语言存储统一用 key `app_lang`，popup 与 content-script 共享。
+ * 说明：语言完全跟随浏览器，不提供手动切换、不持久化。
  *
  * 用法：
- *   const lang = await getLang();
- *   setCurrentLang(lang);   // 初始化一次
- *   t('home.tone')          // 之后直接同步取词
+ *   const lang = await initI18n();  // 初始化并设置 currentLang
+ *   t('home.tone')                  // 之后直接同步取词
  */
 
 import zh from './zh.js';
@@ -21,14 +19,12 @@ export type Lang = 'zh' | 'en';
 
 export const LANGUAGES: Lang[] = ['zh', 'en'];
 
-const STORAGE_KEY = 'app_lang';
-
 const DICTIONARIES: Record<Lang, Record<string, string>> = {
   zh,
   en,
 };
 
-// 当前语言（由 setCurrentLang 设置，t() 依赖它）
+// 当前语言（由 initI18n/setCurrentLang 设置，t() 依赖它）
 let _currentLang: Lang = 'zh';
 
 /** 将任意语言标签规范化为支持的 Lang */
@@ -49,23 +45,9 @@ export function getCurrentLang(): Lang {
   return _currentLang;
 }
 
-/** 读取当前语言（storage → 浏览器检测 → 默认 zh） */
-export async function getLang(): Promise<Lang> {
-  try {
-    const data = await chrome.storage.local.get(STORAGE_KEY);
-    if (data && data[STORAGE_KEY]) {
-      return normalizeLang(data[STORAGE_KEY]);
-    }
-  } catch {
-    // storage 不可用时走浏览器检测
-  }
+/** 检测浏览器语言（仅依据 navigator.language，不回退 storage） */
+export function getLang(): Lang {
   return normalizeLang(navigator.language);
-}
-
-/** 写入语言（手动切换） */
-export async function setLang(lang: Lang): Promise<void> {
-  await chrome.storage.local.set({ [STORAGE_KEY]: lang });
-  setCurrentLang(lang);
 }
 
 /** 取词（依赖 setCurrentLang 已设置） */
@@ -75,7 +57,7 @@ export function t(key: string): string {
 
 /** 便捷：初始化语言并设置 currentLang */
 export async function initI18n(): Promise<Lang> {
-  const lang = await getLang();
+  const lang = getLang();
   setCurrentLang(lang);
   return lang;
 }

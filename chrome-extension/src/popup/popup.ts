@@ -14,7 +14,7 @@ import { HotelConfigService } from '../config/service.js';
 import { inviteCodeService } from '../config/invite_service.js';
 import type { CurrentHotel, HotelConfig, ReplySettings } from '../config/models.js';
 import { getDefaultReplySettings } from '../config/models.js';
-import { initI18n, setLang, getCurrentLang, t, type Lang } from '../i18n/index.js';
+import { initI18n, getCurrentLang, t } from '../i18n/index.js';
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
@@ -34,18 +34,9 @@ async function render() {
   const header = document.querySelector('.header');
   if (header) {
     header.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <h1>✦ ${t('app.title')}</h1>
-          <p>${t('app.subtitle')}</p>
-        </div>
-        <button id="lang-switch-btn"
-                style="background:rgba(255,255,255,0.18);border:none;border-radius:6px;color:white;padding:4px 8px;font-size:12px;cursor:pointer;">
-          ${t('lang.switch')}
-        </button>
-      </div>
+      <h1>✦ ${t('app.title')}</h1>
+      <p>${t('app.subtitle')}</p>
     `;
-    document.getElementById('lang-switch-btn')!.addEventListener('click', onToggleLang);
   }
 
   // 1. 检查邀请码
@@ -62,13 +53,6 @@ async function render() {
   }
 
   return renderHotelHome(current);
-}
-
-/** 切换中/英语言并重渲染 */
-async function onToggleLang() {
-  const next: Lang = getCurrentLang() === 'zh' ? 'en' : 'zh';
-  await setLang(next);
-  await render();
 }
 
 // ── 视图 0：邀请码 ─────────────────────────────────────────────────────────
