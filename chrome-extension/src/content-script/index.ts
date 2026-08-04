@@ -341,7 +341,7 @@ function renderCompleted() {
       <div class="ha-reply-box" id="ha-reply-box">${reply || t('widget.empty_reply')}</div>
     </div>
     <div class="ha-panel-footer">
-      <div class="ha-actions ha-actions-col">
+      <div class="ha-actions">
         <button class="ha-btn ha-btn-secondary" id="ha-edit-btn">${t('widget.edit_reply')}</button>
         <button class="ha-btn ha-btn-primary" id="ha-copy-btn">${t('widget.copy')}</button>
         <button class="ha-btn ha-btn-text" id="ha-retry-btn">${t('widget.regenerate')}</button>
@@ -591,9 +591,6 @@ function getStyles() {
     .ha-reply-box.streaming { border-color: #667eea; }
 
     .ha-actions { display: flex; gap: 8px; margin-bottom: 8px; }
-    /* 竖排操作按钮（completed 视图：编辑/复制/重新生成） */
-    .ha-actions-col { flex-direction: column; }
-    .ha-actions-col .ha-btn { width: 100%; padding: 10px; }
     .ha-btn {
       flex: 1; padding: 10px; border: none; border-radius: 8px;
       font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
@@ -604,7 +601,7 @@ function getStyles() {
     .ha-btn-secondary { background: #f0f0f0; color: #555; }
     .ha-btn-secondary:hover { background: #e5e5e5; }
     .ha-btn-text {
-      background: none; border: 1px solid #ddd; color: #999; font-size: 13px; padding: 8px;
+      background: none; border: 1px solid #ddd; color: #999; font-size: 14px; padding: 10px;
     }
     .ha-btn-text:hover { border-color: #667eea; color: #667eea; }
 
