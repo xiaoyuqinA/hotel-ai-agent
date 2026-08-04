@@ -67,6 +67,7 @@
     .download p { color: #666; font-size: 14px; margin-bottom: 24px; }
     .dl-btn { display: inline-block; background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; padding: 12px 32px; border-radius: 24px; text-decoration: none; font-size: 15px; font-weight: 600; margin: 0 8px; }
     .dl-btn.secondary { background: #f1f3f4; color: #667eea; }
+    .dl-btn.disabled { background: #e9e9e9; color: #aaa; cursor: not-allowed; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -102,9 +103,9 @@
     <p class="section-sub">支持 Chrome / Edge 浏览器</p>
     <div class="download">
       <h2>如何安装</h2>
-      <p>推荐通过 <b>Edge 扩展商店</b> 安装（安全、自动更新）。也可下载压缩包手动加载。</p>
-      <a class="dl-btn" href="#">Edge 扩展商店</a>
-      <a class="dl-btn secondary" href="/static/hotel-review-ai-assistant.zip">下载压缩包</a>
+      <p>当前请优先<b>下载压缩包</b>手动安装（Edge 扩展商店正在审核中，即将上线）。</p>
+      <a class="dl-btn" href="/static/hotel-review-ai-assistant.zip">下载压缩包</a>
+      <a class="dl-btn secondary disabled" href="javascript:void(0)" title="Edge 扩展商店审核中，即将上线">Edge 扩展商店 · 即将上线</a>
       <div style="margin-top:16px;font-size:13px;color:#888;">需要商家邀请码才能使用，请联系客服获取。</div>
     </div>
     <div class="steps" id="manual-install">
@@ -131,7 +132,7 @@
 
     <h2 class="section-title" id="faq">常见问题</h2>
     <div class="faq">
-      <div class="faq-item"><h4>Q: 扩展在哪些浏览器上可用？</h4><p>Chrome 和 Edge 均可使用。推荐通过 Edge 扩展商店安装以获得自动更新。</p></div>
+      <div class="faq-item"><h4>Q: 扩展在哪些浏览器上可用？</h4><p>Chrome 和 Edge 均可使用。目前 Edge 扩展商店正在审核中，可先下载压缩包手动安装；商店上线后可获得自动更新。</p></div>
       <div class="faq-item"><h4>Q: 需要邀请码吗？怎么获取？</h4><p>需要。邀请码由商家运营方发放，用于验证使用资格。请扫码添加企业微信客服，提供您的酒店信息，客服会为您开通使用资格。</p></div>
       <div class="faq-item"><h4>Q: 扩展会收集我的数据吗？</h4><p>不会。扩展不收集浏览历史，不追踪用户。评论内容仅在您主动点击"生成回复"时发送到服务器用于生成 AI 回复，其余配置仅存本地。</p></div>
       <div class="faq-item"><h4>Q: 生成回复慢怎么办？</h4><p>回复生成依赖后端 AI 服务，通常需 3-10 秒。若长时间无响应，请刷新页面重试。</p></div>
