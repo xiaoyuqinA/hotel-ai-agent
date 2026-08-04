@@ -540,7 +540,7 @@ function getStyles() {
     #hotel-ai-panel {
       position: fixed; right: 24px; bottom: 88px;
       width: 420px; max-width: calc(100vw - 48px);
-      max-height: calc(100vh - 80px);
+      min-height: 340px; max-height: calc(100vh - 80px);
       background: white; border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.18);
       z-index: 2147483646;
@@ -564,7 +564,7 @@ function getStyles() {
       font-size: 16px; display: flex; align-items: center; justify-content: center;
     }
     .ha-btn-icon:hover { background: rgba(255,255,255,0.3); }
-    .ha-panel-body { padding: 14px 16px 0; overflow-y: auto; flex: 1; min-height: 120px; }
+    .ha-panel-body { padding: 14px 16px 0; overflow-y: auto; flex: 1; min-height: 220px; }
     .ha-hotel-badge { font-size: 13px; font-weight: 500; color: #555; margin-bottom: 10px; }
 
     /* 底部操作区固定可见，不随内容滚动 */
