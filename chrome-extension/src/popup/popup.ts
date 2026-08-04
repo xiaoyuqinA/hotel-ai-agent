@@ -140,6 +140,8 @@ function renderCreateHotel(errorMsg?: string) {
              placeholder="${t('create.city_placeholder')}"
              style="margin-bottom:12px;" />
       <button class="btn btn-primary" id="create-hotel-btn">${t('create.submit')}</button>
+      <button class="btn btn-secondary" id="skip-hotel-btn"
+              style="margin-top:8px;">${t('create.skip')}</button>
       <div id="create-status" class="status-text ${errorMsg ? 'error' : ''}">
         ${errorMsg || ''}
       </div>
@@ -147,6 +149,7 @@ function renderCreateHotel(errorMsg?: string) {
   `;
 
   document.getElementById('create-hotel-btn')!.addEventListener('click', onCreateHotel);
+  document.getElementById('skip-hotel-btn')!.addEventListener('click', () => window.close());
 }
 
 async function onCreateHotel() {

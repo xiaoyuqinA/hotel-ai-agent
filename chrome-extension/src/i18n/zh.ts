@@ -38,6 +38,7 @@ export default {
   'create.name_placeholder': '酒店名称（如：深圳湾万豪酒店）',
   'create.city_placeholder': '所在城市（如：深圳）',
   'create.submit': '创建酒店',
+  'create.skip': '跳过',
   'create.creating': '创建中...',
   'create.name_required': '请输入酒店名称',
   'create.city_required': '请输入所在城市',

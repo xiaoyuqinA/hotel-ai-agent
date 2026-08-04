@@ -37,6 +37,7 @@ export default {
   'create.name_placeholder': 'Hotel name (e.g. Shenzhen Bay Marriott)',
   'create.city_placeholder': 'City (e.g. Shenzhen)',
   'create.submit': 'Create Hotel',
+  'create.skip': 'Skip',
   'create.creating': 'Creating...',
   'create.name_required': 'Please enter a hotel name',
   'create.city_required': 'Please enter a city',
