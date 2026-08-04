@@ -13,7 +13,8 @@ import { LocalHotelConfigRepository } from '../config/local_repository.js';
 import { HotelConfigService } from '../config/service.js';
 import { inviteCodeService } from '../config/invite_service.js';
 import type { CurrentHotel, HotelConfig, ReplySettings } from '../config/models.js';
-import { DEFAULT_REPLY_SETTINGS } from '../config/models.js';
+import { getDefaultReplySettings } from '../config/models.js';
+import { initI18n, setLang, getCurrentLang, t, type Lang } from '../i18n/index.js';
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,27 @@ let contentEl: HTMLElement;
 
 async function render() {
   contentEl = document.getElementById('app-content')!;
+
+  // 初始化语言（当前语言 -> 渲染文案）
+  await initI18n();
+  // 更新文档标题与 header（静态占位由 JS 注入）
+  document.title = t('app.title');
+  const header = document.querySelector('.header');
+  if (header) {
+    header.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h1>✦ ${t('app.title')}</h1>
+          <p>${t('app.subtitle')}</p>
+        </div>
+        <button id="lang-switch-btn"
+                style="background:rgba(255,255,255,0.18);border:none;border-radius:6px;color:white;padding:4px 8px;font-size:12px;cursor:pointer;">
+          ${t('lang.switch')}
+        </button>
+      </div>
+    `;
+    document.getElementById('lang-switch-btn')!.addEventListener('click', onToggleLang);
+  }
 
   // 1. 检查邀请码
   const inviteCode = await inviteCodeService.get();
@@ -41,19 +63,26 @@ async function render() {
   return renderHotelHome(current);
 }
 
+/** 切换中/英语言并重渲染 */
+async function onToggleLang() {
+  const next: Lang = getCurrentLang() === 'zh' ? 'en' : 'zh';
+  await setLang(next);
+  await render();
+}
+
 // ── 视图 0：邀请码 ─────────────────────────────────────────────────────────
 
 function renderInviteCode() {
   contentEl.innerHTML = `
     <div class="section">
-      <div class="label">🔑 邀请码</div>
+      <div class="label">${t('invite.label')}</div>
       <p style="font-size:13px;color:#666;margin-bottom:12px;">
-        请输入商家邀请码开始使用
+        ${t('invite.hint')}
       </p>
       <input class="input" id="invite-code-input"
-             placeholder="INVITE-XXXX"
+             placeholder="${t('invite.placeholder')}"
              style="margin-bottom:8px;" />
-      <button class="btn btn-primary" id="verify-invite-btn">验证</button>
+      <button class="btn btn-primary" id="verify-invite-btn">${t('invite.verify')}</button>
       <div id="invite-status" class="status-text"></div>
     </div>
   `;
@@ -69,14 +98,14 @@ async function onVerifyInvite() {
   const input = document.getElementById('invite-code-input') as HTMLInputElement;
   const code = input.value.trim();
   if (!code) {
-    showStatus('invite-status', '请输入邀请码', 'error');
+    showStatus('invite-status', t('invite.required'), 'error');
     return;
   }
 
-  showStatus('invite-status', '验证中...', '');
+  showStatus('invite-status', t('invite.verifying'), '');
   const btn = document.getElementById('verify-invite-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = '验证中';
+  btn.textContent = t('invite.verifying');
 
   try {
     const result = await inviteCodeService.validate(code);
@@ -84,14 +113,14 @@ async function onVerifyInvite() {
       await inviteCodeService.set(code);
       await render();
     } else {
-      showStatus('invite-status', result.message || '邀请码无效', 'error');
+      showStatus('invite-status', inviteErrorMessage(result), 'error');
       btn.disabled = false;
-      btn.textContent = '验证';
+      btn.textContent = t('invite.verify');
     }
   } catch {
-    showStatus('invite-status', '验证失败，请稍后重试', 'error');
+    showStatus('invite-status', t('invite.verify_failed_retry'), 'error');
     btn.disabled = false;
-    btn.textContent = '验证';
+    btn.textContent = t('invite.verify');
   }
 }
 
@@ -100,17 +129,17 @@ async function onVerifyInvite() {
 function renderCreateHotel(errorMsg?: string) {
   contentEl.innerHTML = `
     <div class="section">
-      <div class="label">欢迎使用</div>
+      <div class="label">${t('create.welcome')}</div>
       <p style="font-size:13px;color:#666;margin-bottom:12px;">
-        请先创建酒店配置，开始使用 AI 回复助手
+        ${t('create.hint')}
       </p>
       <input class="input" id="hotel-name-input"
-             placeholder="酒店名称（如：深圳湾万豪酒店）"
+             placeholder="${t('create.name_placeholder')}"
              style="margin-bottom:8px;" />
       <input class="input" id="hotel-city-input"
-             placeholder="所在城市（如：深圳）"
+             placeholder="${t('create.city_placeholder')}"
              style="margin-bottom:12px;" />
-      <button class="btn btn-primary" id="create-hotel-btn">创建酒店</button>
+      <button class="btn btn-primary" id="create-hotel-btn">${t('create.submit')}</button>
       <div id="create-status" class="status-text ${errorMsg ? 'error' : ''}">
         ${errorMsg || ''}
       </div>
@@ -127,17 +156,17 @@ async function onCreateHotel() {
   const city = cityInput.value.trim();
 
   if (!name) {
-    showStatus('create-status', '请输入酒店名称', 'error');
+    showStatus('create-status', t('create.name_required'), 'error');
     return;
   }
   if (!city) {
-    showStatus('create-status', '请输入所在城市', 'error');
+    showStatus('create-status', t('create.city_required'), 'error');
     return;
   }
 
   const btn = document.getElementById('create-hotel-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = '创建中...';
+  btn.textContent = t('create.creating');
 
   try {
     const hotel = await configService.createHotel({ name, city });
@@ -147,9 +176,9 @@ async function onCreateHotel() {
     });
     await render();
   } catch (e) {
-    showStatus('create-status', '创建失败：' + (e as Error).message, 'error');
+    showStatus('create-status', t('create.failed') + (e as Error).message, 'error');
     btn.disabled = false;
-    btn.textContent = '创建酒店';
+    btn.textContent = t('create.submit');
   }
 }
 
@@ -166,24 +195,24 @@ async function renderHotelHome(current: CurrentHotel) {
     </div>
 
     <div class="section" id="settings-preview">
-      <div class="label">回复配置</div>
+      <div class="label">${t('home.reply_config')}</div>
       <div style="text-align:center;padding:20px;color:#999;font-size:13px;">
-        加载中...
+        ${t('home.loading')}
       </div>
     </div>
 
     <div class="section">
       <button class="settings-btn" id="edit-settings-btn">
-        ✎ 编辑回复设置
+        ${t('home.edit_settings')}
       </button>
     </div>
 
     <div class="section" id="invite-code-section">
-      <div class="label">🔑 邀请码</div>
+      <div class="label">${t('invite.label')}</div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-        <span id="invite-code-text" style="font-size:13px;color:#999;">加载中...</span>
+        <span id="invite-code-text" style="font-size:13px;color:#999;">${t('home.loading')}</span>
         <button class="btn btn-secondary" id="change-invite-btn"
-                style="width:auto;padding:4px 10px;font-size:12px;">更换</button>
+                style="width:auto;padding:4px 10px;font-size:12px;">${t('invite.change')}</button>
       </div>
     </div>
   `;
@@ -200,7 +229,7 @@ async function loadInviteCode() {
   const el = document.getElementById('invite-code-text');
   if (!el) return;
   const code = await inviteCodeService.get();
-  el.textContent = code || '未设置';
+  el.textContent = code || t('invite.not_set');
 }
 
 function renderInviteCodeInput() {
@@ -208,18 +237,18 @@ function renderInviteCodeInput() {
     <div class="section">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <button class="btn btn-secondary" id="back-btn"
-                style="width:auto;padding:6px 14px;font-size:13px;">← 返回</button>
-        <span style="font-weight:500;">修改邀请码</span>
+                style="width:auto;padding:6px 14px;font-size:13px;">${t('edit.back')}</button>
+        <span style="font-weight:500;">${t('invite.edit_title')}</span>
       </div>
     </div>
     <div class="section">
-      <div class="label">邀请码</div>
+      <div class="label">${t('invite.label')}</div>
       <input class="input" id="edit-invite-input"
-             placeholder="输入新邀请码"
+             placeholder="${t('invite.new_placeholder')}"
              style="margin-bottom:12px;" />
       <div class="btn-row">
-        <button class="btn btn-secondary" id="cancel-invite-btn">取消</button>
-        <button class="btn btn-primary" id="save-invite-btn">保存</button>
+        <button class="btn btn-secondary" id="cancel-invite-btn">${t('invite.cancel')}</button>
+        <button class="btn btn-primary" id="save-invite-btn">${t('invite.save')}</button>
       </div>
       <div id="edit-invite-status" class="status-text hidden"></div>
     </div>
@@ -234,29 +263,29 @@ async function onSaveInviteCode() {
   const input = document.getElementById('edit-invite-input') as HTMLInputElement;
   const code = input.value.trim();
   if (!code) {
-    showStatus('edit-invite-status', '请输入邀请码', 'error');
+    showStatus('edit-invite-status', t('invite.required'), 'error');
     return;
   }
 
   const btn = document.getElementById('save-invite-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = '验证中...';
+  btn.textContent = t('invite.verifying');
 
   try {
     const result = await inviteCodeService.validate(code);
     if (result.valid) {
       await inviteCodeService.set(code);
-      showStatus('edit-invite-status', '✅ 邀请码已更新', 'success');
+      showStatus('edit-invite-status', t('invite.updated'), 'success');
       setTimeout(() => render(), 1200);
     } else {
-      showStatus('edit-invite-status', result.message || '邀请码无效', 'error');
+      showStatus('edit-invite-status', inviteErrorMessage(result), 'error');
       btn.disabled = false;
-      btn.textContent = '保存';
+      btn.textContent = t('invite.save');
     }
   } catch {
-    showStatus('edit-invite-status', '验证失败', 'error');
+    showStatus('edit-invite-status', t('invite.validate_failed'), 'error');
     btn.disabled = false;
-    btn.textContent = '保存';
+    btn.textContent = t('invite.save');
   }
 }
 
@@ -264,28 +293,28 @@ async function loadSettingsPreview(hotelId: string) {
   const container = document.getElementById('settings-preview')!;
   try {
     const hotel = await configService.getHotel(hotelId);
-    const settings = hotel?.reply_settings ?? DEFAULT_REPLY_SETTINGS;
+    const settings = hotel?.reply_settings ?? getDefaultReplySettings(getCurrentLang());
     container.innerHTML = `
-      <div class="label">回复配置</div>
+      <div class="label">${t('home.reply_config')}</div>
       <div class="config-item">
-        <div class="config-label">回复语气</div>
-        <div class="config-value">${settings.tone || '未设置'}</div>
+        <div class="config-label">${t('home.tone')}</div>
+        <div class="config-value">${settings.tone || t('home.unset')}</div>
       </div>
       <div class="config-item">
-        <div class="config-label">回复风格</div>
-        <div class="config-value">${settings.style || '未设置'}</div>
+        <div class="config-label">${t('home.style')}</div>
+        <div class="config-value">${settings.style || t('home.unset')}</div>
       </div>
       <div class="config-item">
-        <div class="config-label">回复规则</div>
+        <div class="config-label">${t('home.rules')}</div>
         <div class="config-value">
-          ${(settings.rules || []).map((r: string) => '• ' + r).join('<br>') || '无'}
+          ${(settings.rules || []).map((r: string) => '• ' + r).join('<br>') || t('home.none')}
         </div>
       </div>
     `;
   } catch (e) {
     container.innerHTML = `
-      <div class="label">回复配置</div>
-      <div class="status-text error">加载失败：${(e as Error).message}</div>
+      <div class="label">${t('home.reply_config')}</div>
+      <div class="status-text error">${t('status.load_failed')}${(e as Error).message}</div>
     `;
   }
 }
@@ -297,25 +326,25 @@ async function renderEditSettings(current: CurrentHotel) {
     <div class="section">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <button class="btn btn-secondary" id="back-btn"
-                style="width:auto;padding:6px 14px;font-size:13px;">← 返回</button>
+                style="width:auto;padding:6px 14px;font-size:13px;">${t('edit.back')}</button>
         <span style="font-weight:500;">${current.hotel_name}</span>
       </div>
     </div>
 
     <div class="section">
-      <div class="label">回复语气</div>
-      <input class="input" id="edit-tone" placeholder="例如：专业、温暖、真诚"
+      <div class="label">${t('home.tone')}</div>
+      <input class="input" id="edit-tone" placeholder="${t('edit.tone_placeholder')}"
              style="margin-bottom:10px;" />
-      <div class="label">回复风格</div>
-      <input class="input" id="edit-style" placeholder="例如：正式但具有人情味"
+      <div class="label">${t('home.style')}</div>
+      <input class="input" id="edit-style" placeholder="${t('edit.style_placeholder')}"
              style="margin-bottom:10px;" />
-      <div class="label">回复规则（每行一条）</div>
+      <div class="label">${t('edit.rules_label')}</div>
       <textarea class="textarea" id="edit-rules" rows="4"
-                placeholder="投诉必须先表达歉意"></textarea>
+                placeholder="${t('edit.rules_placeholder')}"></textarea>
 
       <div class="btn-row">
-        <button class="btn btn-secondary" id="cancel-edit-btn">取消</button>
-        <button class="btn btn-primary" id="save-settings-btn">保存设置</button>
+        <button class="btn btn-secondary" id="cancel-edit-btn">${t('edit.cancel')}</button>
+        <button class="btn btn-primary" id="save-settings-btn">${t('edit.save')}</button>
       </div>
       <div id="edit-status" class="status-text hidden"></div>
     </div>
@@ -324,12 +353,12 @@ async function renderEditSettings(current: CurrentHotel) {
   // 加载当前设置
   try {
     const hotel = await configService.getHotel(current.hotel_id);
-    const settings = hotel?.reply_settings ?? DEFAULT_REPLY_SETTINGS;
+    const settings = hotel?.reply_settings ?? getDefaultReplySettings(getCurrentLang());
     (document.getElementById('edit-tone') as HTMLInputElement).value = settings.tone || '';
     (document.getElementById('edit-style') as HTMLInputElement).value = settings.style || '';
     (document.getElementById('edit-rules') as HTMLTextAreaElement).value = (settings.rules || []).join('\n');
   } catch (e) {
-    showStatus('edit-status', '加载失败：' + (e as Error).message, 'error');
+    showStatus('edit-status', t('edit.load_failed') + (e as Error).message, 'error');
   }
 
   document.getElementById('back-btn')!.addEventListener('click', () => render());
@@ -344,22 +373,22 @@ async function onSaveSettings(current: CurrentHotel) {
   const rules = rulesRaw ? rulesRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 
   if (!tone) {
-    showStatus('edit-status', '回复语气不能为空', 'error');
+    showStatus('edit-status', t('edit.tone_required'), 'error');
     return;
   }
 
   const btn = document.getElementById('save-settings-btn') as HTMLButtonElement;
   btn.disabled = true;
-  btn.textContent = '保存中...';
+  btn.textContent = t('edit.saving');
 
   try {
     await configService.updateReplySettings(current.hotel_id, { tone, style, rules });
-    showStatus('edit-status', '✅ 设置已保存', 'success');
+    showStatus('edit-status', t('edit.saved'), 'success');
     setTimeout(() => render(), 1200);
   } catch (e) {
-    showStatus('edit-status', '保存失败：' + (e as Error).message, 'error');
+    showStatus('edit-status', t('edit.save_failed') + (e as Error).message, 'error');
     btn.disabled = false;
-    btn.textContent = '保存设置';
+    btn.textContent = t('edit.save');
   }
 }
 
@@ -372,14 +401,14 @@ async function onShowHotelList() {
 
   modal.innerHTML = `
     <div class="modal-content">
-      <h3>选择酒店</h3>
+      <h3>${t('modal.select_hotel')}</h3>
       ${hotels.map(h => `
         <div class="modal-hotel-item" data-id="${h.id}" data-name="${h.name}">
           <div class="m-name">${h.name} ${current && current.hotel_id === h.id ? '✓' : ''}</div>
           <div class="m-id">${h.id}</div>
         </div>
       `).join('')}
-      <div class="modal-new-hotel" id="modal-new-hotel-btn">+ 创建新酒店</div>
+      <div class="modal-new-hotel" id="modal-new-hotel-btn">${t('modal.new_hotel')}</div>
     </div>
   `;
 
@@ -407,6 +436,17 @@ async function onShowHotelList() {
 }
 
 // ── 通用 ──────────────────────────────────────────────────────────────────────
+
+/** 将邀请码验证的错误码映射为当前语言的提示文案 */
+function inviteErrorMessage(result: { errorCode?: string; message?: string }): string {
+  switch (result.errorCode) {
+    case 'not_exist': return t('invite.not_exist');
+    case 'expired': return t('invite.expired');
+    case 'validate_failed': return t('invite.validate_failed');
+    case 'conn_failed': return t('invite.conn_failed');
+    default: return result.message || t('invite.invalid');
+  }
+}
 
 function showStatus(id: string, msg: string, type: 'error' | 'success' | 'hidden') {
   const el = document.getElementById(id)!;

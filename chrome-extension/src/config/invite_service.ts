@@ -35,8 +35,9 @@ export class InviteCodeService {
 
   /**
    * 验证邀请码是否有效（调后端 /api/invite/validate）
+   * 返回语义化 errorCode，由 UI 层通过 t() 翻译，支持多语言。
    */
-  async validate(code: string): Promise<{ valid: boolean; message?: string }> {
+  async validate(code: string): Promise<{ valid: boolean; errorCode?: string; message?: string }> {
     try {
       const apiUrl = await this._getApiUrl();
       const resp = await fetch(`${apiUrl}/review/invite/validate`, {
@@ -46,29 +47,29 @@ export class InviteCodeService {
       });
 
       if (resp.status === 404) {
-        return { valid: false, message: '邀请码不存在' };
+        return { valid: false, errorCode: 'not_exist' };
       }
       if (resp.status === 410) {
-        return { valid: false, message: '邀请码已过期' };
+        return { valid: false, errorCode: 'expired' };
       }
       if (!resp.ok) {
-        return { valid: false, message: '验证失败' };
+        return { valid: false, errorCode: 'validate_failed' };
       }
 
       const data = await resp.json();
       return { valid: data.valid ?? true };
     } catch {
-      return { valid: false, message: '无法连接服务器' };
+      return { valid: false, errorCode: 'conn_failed' };
     }
   }
 
   /**
    * 检查当前保存的邀请码是否仍有效
    */
-  async checkCurrent(): Promise<{ valid: boolean; message?: string }> {
+  async checkCurrent(): Promise<{ valid: boolean; errorCode?: string; message?: string }> {
     const code = await this.get();
     if (!code) {
-      return { valid: false, message: '未设置邀请码' };
+      return { valid: false, errorCode: 'unset' };
     }
     return this.validate(code);
   }

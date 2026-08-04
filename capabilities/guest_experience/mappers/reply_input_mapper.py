@@ -38,6 +38,8 @@ class ReplyInputMapper:
             "original_comment": state["reviews_content"],
             "analysis": analysis_data,
             "hotel_context": ctx,
+            # 回复语言（zh / en），prompt 据此决定输出语言
+            "language": state.get("language", "zh") or "zh",
         }
         logger.info("Full Agent input JSON:\n%s", json.dumps(result, ensure_ascii=False, default=str))
         return json.dumps(result, ensure_ascii=False, default=str)

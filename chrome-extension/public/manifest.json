@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "酒店评论AI助手",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
-  "description": "智能生成酒店评论回复",
+  "description": "__MSG_extDescription__",
+  "default_locale": "zh_CN",
   "permissions": [
     "activeTab",
     "storage"

@@ -110,7 +110,7 @@ describe('InviteCodeService', () => {
 
       const result = await service.validate('INVITE-NOT-FOUND')
       expect(result.valid).toBe(false)
-      expect(result.message).toBe('邀请码不存在')
+      expect(result.errorCode).toBe('not_exist')
     })
 
     it('过期的邀请码 410 应返回 valid=false', async () => {
@@ -121,7 +121,7 @@ describe('InviteCodeService', () => {
 
       const result = await service.validate('INVITE-EXPIRED')
       expect(result.valid).toBe(false)
-      expect(result.message).toBe('邀请码已过期')
+      expect(result.errorCode).toBe('expired')
     })
 
     it('其他错误状态码应返回 valid=false', async () => {
@@ -132,7 +132,7 @@ describe('InviteCodeService', () => {
 
       const result = await service.validate('INVITE-ERROR')
       expect(result.valid).toBe(false)
-      expect(result.message).toBe('验证失败')
+      expect(result.errorCode).toBe('validate_failed')
     })
 
     it('网络错误应返回 valid=false', async () => {
@@ -140,7 +140,7 @@ describe('InviteCodeService', () => {
 
       const result = await service.validate('INVITE-NET')
       expect(result.valid).toBe(false)
-      expect(result.message).toBe('无法连接服务器')
+      expect(result.errorCode).toBe('conn_failed')
     })
 
     it('该 API 地址应来自 chrome.runtime.sendMessage', async () => {
@@ -154,7 +154,7 @@ describe('InviteCodeService', () => {
       await service.validate('INVITE-TEST')
 
       const calledUrl = fetchMock.mock.calls[0][0]
-      expect(calledUrl).toContain('localhost:8000/api/invite/validate')
+      expect(calledUrl).toContain('localhost:8000/review/invite/validate')
 
       // 验证 POST body 中包含邀请码
       const calledBody = fetchMock.mock.calls[0][1].body
@@ -169,7 +169,7 @@ describe('InviteCodeService', () => {
     it('未设置邀请码应返回 valid=false', async () => {
       const result = await service.checkCurrent()
       expect(result.valid).toBe(false)
-      expect(result.message).toBe('未设置邀请码')
+      expect(result.errorCode).toBe('unset')
     })
 
     it('有邀请码时调 validate', async () => {

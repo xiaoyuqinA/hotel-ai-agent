@@ -54,7 +54,7 @@ export interface CreateHotelInput {
   reply_settings?: Partial<ReplySettings>;
 }
 
-/** 默认回复设置 */
+/** 默认回复设置（中文，兼容旧调用） */
 export const DEFAULT_REPLY_SETTINGS: ReplySettings = {
   tone: '专业、真诚',
   style: '正式且具有人情味',
@@ -64,3 +64,19 @@ export const DEFAULT_REPLY_SETTINGS: ReplySettings = {
     '回复控制在 100-200 字',
   ],
 };
+
+/** 英文默认回复设置 */
+const DEFAULT_REPLY_SETTINGS_EN: ReplySettings = {
+  tone: 'Professional, sincere',
+  style: 'Formal but personable',
+  rules: [
+    'Always apologize first for complaints',
+    'Address the guest as "Dear Guest"',
+    'Keep replies between 100-200 characters',
+  ],
+};
+
+/** 按语言返回默认回复设置 */
+export function getDefaultReplySettings(lang: string): ReplySettings {
+  return lang === 'en' ? DEFAULT_REPLY_SETTINGS_EN : DEFAULT_REPLY_SETTINGS;
+}

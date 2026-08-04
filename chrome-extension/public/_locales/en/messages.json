@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Hotel Review AI Assistant",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "AI-generated hotel review replies",
+    "description": "Extension description"
+  }
+}

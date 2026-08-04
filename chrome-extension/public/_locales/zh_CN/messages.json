@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "酒店评论AI助手",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "智能生成酒店评论回复",
+    "description": "Extension description"
+  }
+}

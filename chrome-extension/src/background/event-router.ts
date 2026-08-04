@@ -8,6 +8,11 @@
  * - 发送消息到 Content Script
  */
 
+import { initI18n, t } from '../i18n/index.js';
+
+// 初始化语言（异步，通常早于首个事件）
+initI18n();
+
 // UI 消息类型枚举（与 content-script 对齐）
 export const UIMessageType = {
   WORKFLOW_STARTED: 'WORKFLOW_STARTED',
@@ -74,7 +79,7 @@ function handleSystemEvent(event, tabId) {
       sendToContentScript(tabId, {
         type: UIMessageType.WORKFLOW_ERROR,
         payload: {
-          error: event.error || '工作流执行失败',
+          error: event.error || t('widget.operation_failed'),
         },
       })
       sendStatusUpdate(tabId, 'error', event.display_name)
@@ -110,7 +115,7 @@ function handleProgressEvent(event, tabId) {
       break
 
     case 'custom_event':
-      message = event.event_type || '处理中'
+      message = event.event_type || t('widget.processing')
       break
   }
 

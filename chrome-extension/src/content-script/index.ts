@@ -15,6 +15,7 @@ import type { OTAAdapter } from './adapters/types.js';
 import { detectAdapter } from './adapters/registry.js';
 import { LocalHotelConfigRepository } from '../config/local_repository.js';
 import { HotelConfigService } from '../config/service.js';
+import { initI18n, setCurrentLang, normalizeLang, t } from '../i18n/index.js';
 
 const store = createStore();
 const configService = new HotelConfigService(new LocalHotelConfigRepository());
@@ -59,6 +60,23 @@ async function _ensureRuntimeReady(maxRetries = 10, interval = 500): Promise<boo
 }
 
 function init() {
+  // 初始化语言（storage → 浏览器检测）
+  initI18n().then((lang) => {
+    setCurrentLang(lang);
+    // 若面板已渲染，刷新文案
+    if (panel) renderCurrentView();
+  });
+
+  // 语言切换（popup 修改 storage 时同步）
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes['app_lang']) {
+        setCurrentLang(normalizeLang(changes['app_lang'].newValue));
+        if (panel) renderCurrentView();
+      }
+    });
+  } catch { /* storage listener 不可用时忽略 */ }
+
   // 注册消息监听
   chrome.runtime.onMessage.addListener(handleMessage);
   injectStyles();
@@ -118,7 +136,7 @@ function handleTokenDelta(payload) {
 
 function handleWorkflowCompleted(payload) {
   store.handleEvent({ kind: 'workflow_completed', result: payload.result, category: 'system' });
-  updateStatus('completed', payload.status || '回复生成完成');
+  updateStatus('completed', payload.status || t('widget.reply_generated'));
   // replyContent 已由 token_delta 流式累积，不再覆盖
   setPanelView('completed');
 }
@@ -140,7 +158,7 @@ function injectFAB() {
   fab.id = 'hotel-ai-fab';
   fab.className = 'hotel-ai-fab';
   fab.innerHTML = '<span>✦</span>';
-  fab.title = 'AI 回复助手';
+  fab.title = t('widget.title');
 
   fab.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -216,13 +234,19 @@ function setPanelView(view) {
   }
 }
 
+/** 按当前视图重新渲染（语言切换后刷新文案） */
+function renderCurrentView() {
+  if (!panel) return;
+  setPanelView(panel.dataset.view || 'idle');
+}
+
 function renderHeader() {
   return `
     <div class="ha-panel-header">
-      <span class="ha-panel-title">✦ AI 回复助手</span>
+      <span class="ha-panel-title">✦ ${t('widget.title')}</span>
       <div class="ha-panel-actions">
-        <button class="ha-btn-icon" id="ha-minimize-btn" title="最小化">−</button>
-        <button class="ha-btn-icon" id="ha-close-btn" title="关闭">×</button>
+        <button class="ha-btn-icon" id="ha-minimize-btn" title="${t('widget.minimize')}">−</button>
+        <button class="ha-btn-icon" id="ha-close-btn" title="${t('widget.close')}">×</button>
       </div>
     </div>
   `;
@@ -232,9 +256,9 @@ function renderNoHotel() {
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
       <div class="ha-empty">
-        <p>请先在扩展中创建或选择酒店</p>
+        <p>${t('widget.no_hotel')}</p>
         <p style="font-size:12px;color:#999;margin-top:8px;">
-          点击 Chrome 工具栏的扩展图标打开配置
+          ${t('widget.no_hotel_hint')}
         </p>
       </div>
     </div>
@@ -251,12 +275,12 @@ async function renderIdle() {
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
       <div class="ha-hotel-badge">
-        ✨ AI 回复助手
+        ✨ ${t('widget.title')}
       </div>
       <div class="ha-review-box" id="ha-review-text">
-        ${review || '<span class="ha-placeholder">选中评论后，点击「生成回复」</span>'}
+        ${review || `<span class="ha-placeholder">${t('widget.review_placeholder')}</span>`}
       </div>
-      <button class="ha-btn ha-btn-primary" id="ha-generate-btn">AI生成回复</button>
+      <button class="ha-btn ha-btn-primary" id="ha-generate-btn">${t('widget.generate')}</button>
     </div>
   `;
   bindHeaderEvents();
@@ -296,10 +320,10 @@ function renderRunning() {
     <div class="ha-panel-body">
       <div class="ha-status-bar running">
         <span class="ha-status-dot"></span>
-        <span class="ha-status-text" id="ha-status-text">正在生成回复...</span>
+        <span class="ha-status-text" id="ha-status-text">${t('widget.generating')}</span>
       </div>
       <div class="ha-reply-box streaming" id="ha-reply-box">
-        <span class="ha-placeholder">等待回复...</span>
+        <span class="ha-placeholder">${t('widget.waiting')}</span>
       </div>
     </div>
   `;
@@ -314,15 +338,15 @@ function renderCompleted() {
     <div class="ha-panel-body">
       <div class="ha-status-bar completed">
         <span class="ha-status-dot"></span>
-        <span class="ha-status-text">回复已生成</span>
+        <span class="ha-status-text">${t('widget.reply_generated')}</span>
       </div>
-      ${review ? `<div class="ha-review-box"><strong>评论：</strong>${review}</div>` : ''}
-      <div class="ha-reply-box" id="ha-reply-box">${reply || '（空回复）'}</div>
+      ${review ? `<div class="ha-review-box"><strong>${t('widget.review_label')}</strong>${review}</div>` : ''}
+      <div class="ha-reply-box" id="ha-reply-box">${reply || t('widget.empty_reply')}</div>
       <div class="ha-actions">
-        <button class="ha-btn ha-btn-secondary" id="ha-edit-btn">✎ 编辑回复</button>
-        <button class="ha-btn ha-btn-primary" id="ha-copy-btn">📋 复制</button>
+        <button class="ha-btn ha-btn-secondary" id="ha-edit-btn">${t('widget.edit_reply')}</button>
+        <button class="ha-btn ha-btn-primary" id="ha-copy-btn">${t('widget.copy')}</button>
       </div>
-      <button class="ha-btn ha-btn-text" id="ha-retry-btn">重新生成</button>
+      <button class="ha-btn ha-btn-text" id="ha-retry-btn">${t('widget.regenerate')}</button>
     </div>
   `;
   bindHeaderEvents();
@@ -333,16 +357,16 @@ function renderCompleted() {
 
 
 function renderError() {
-  const error = store.getError() || '未知错误';
+  const error = store.getError() || t('widget.unknown_error');
 
   panel.innerHTML = renderHeader() + `
     <div class="ha-panel-body">
       <div class="ha-status-bar error">
         <span class="ha-status-dot"></span>
-        <span class="ha-status-text">操作失败</span>
+        <span class="ha-status-text">${t('widget.operation_failed')}</span>
       </div>
       <div class="ha-error-box">${error}</div>
-      <button class="ha-btn ha-btn-primary" id="ha-retry-btn">重试</button>
+      <button class="ha-btn ha-btn-primary" id="ha-retry-btn">${t('widget.retry')}</button>
     </div>
   `;
   bindHeaderEvents();
@@ -356,13 +380,13 @@ function renderEditing() {
     <div class="ha-panel-body">
       <div class="ha-status-bar">
         <span class="ha-status-dot"></span>
-        <span class="ha-status-text">编辑回复</span>
+        <span class="ha-status-text">${t('widget.editing_reply')}</span>
       </div>
       <textarea class="ha-edit-textarea" id="ha-edit-textarea" rows="6">${reply}</textarea>
       <div class="ha-actions">
-        <button class="ha-btn ha-btn-secondary" id="ha-edit-cancel-btn">取消</button>
-        <button class="ha-btn ha-btn-primary" id="ha-edit-confirm-btn">确认</button>
-        <button class="ha-btn ha-btn-primary" id="ha-edit-publish-btn">确认并发布</button>
+        <button class="ha-btn ha-btn-secondary" id="ha-edit-cancel-btn">${t('widget.edit_cancel')}</button>
+        <button class="ha-btn ha-btn-primary" id="ha-edit-confirm-btn">${t('widget.edit_confirm')}</button>
+        <button class="ha-btn ha-btn-primary" id="ha-edit-publish-btn">${t('widget.edit_publish')}</button>
       </div>
     </div>
   `;
@@ -395,7 +419,7 @@ async function onGenerate() {
 
   const adapter = await getAdapter();
   if (!adapter) {
-    updateStatus('error', '当前页面不支持');
+    updateStatus('error', t('widget.page_not_supported'));
     setPanelView('idle');
     return;
   }
@@ -403,7 +427,7 @@ async function onGenerate() {
   const ctx = await adapter.getReview();
   const review = ctx?.content ?? '';
   if (!review) {
-    updateStatus('error', '无法获取评论内容');
+    updateStatus('error', t('widget.no_review'));
     setPanelView('idle');
     return;
   }
@@ -414,12 +438,12 @@ async function onGenerate() {
   try {
     const inviteResp = await chrome.runtime.sendMessage({ type: 'CHECK_INVITE' }).catch(() => ({ hasInvite: false }));
     if (!inviteResp?.hasInvite) {
-      store.setError('请先在扩展中设置邀请码');
+      store.setError(t('widget.set_invite_first'));
       setPanelView('error');
       return;
     }
   } catch {
-    store.setError('请先在扩展中设置邀请码');
+    store.setError(t('widget.set_invite_first'));
     setPanelView('error');
     return;
   }
@@ -431,7 +455,7 @@ async function onGenerate() {
   // 只发 review，hotel_context 由 Service Worker 自己从 storage 读取
   try {
     if (!chrome.runtime?.id) {
-      updateStatus('error', '扩展已刷新，请重试');
+      updateStatus('error', t('widget.ext_refreshed'));
       setPanelView('error');
       return;
     }
@@ -445,7 +469,7 @@ async function onGenerate() {
     });
   } catch (e) {
     console.error('[AssistantWidget] sendMessage failed:', (e as Error)?.message, e);
-    store.setError('扩展连接异常，请刷新页面后重试');
+    store.setError(t('widget.conn_error'));
     setPanelView('error');
   }
 }
@@ -456,7 +480,7 @@ async function onCopy() {
 
   try {
     await navigator.clipboard.writeText(reply);
-    updateStatus('completed', '✅ 已复制到剪贴板');
+    updateStatus('completed', t('widget.copied'));
   } catch {
     // fallback: 使用 textarea 选择复制
     const textarea = document.createElement('textarea');
@@ -467,7 +491,7 @@ async function onCopy() {
     textarea.select();
     document.execCommand('copy');
     document.body.removeChild(textarea);
-    updateStatus('completed', '✅ 已复制到剪贴板');
+    updateStatus('completed', t('widget.copied'));
   }
 }
 

@@ -130,6 +130,7 @@ async def create_review_run(request: Request) -> dict:
     reviews_content = body.get("reviews_content", "")
     thread_id = body.get("thread_id", "")
     hotel_context = body.get("hotel_context")
+    language = body.get("language", "zh") or "zh"
 
     import json as _json
     logger.info("POST /review/run request: %s", _json.dumps(body, ensure_ascii=False, default=str))
@@ -161,6 +162,8 @@ async def create_review_run(request: Request) -> dict:
         input_data = workflow.input_mapper((hotel_context, reviews_content))
     else:
         input_data = workflow.input_mapper(reviews_content)
+    # 注入回复语言（默认 zh）
+    input_data["language"] = language
     config = {"configurable": {"thread_id": thread_id}}
 
     # 启动后台任务

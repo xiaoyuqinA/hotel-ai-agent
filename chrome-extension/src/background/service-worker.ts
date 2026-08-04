@@ -38,6 +38,7 @@ import { getEventRouter } from './event-router.js'
 import { LocalHotelConfigRepository } from '../config/local_repository.js'
 import { HotelConfigService } from '../config/service.js'
 import { inviteCodeService } from '../config/invite_service.js'
+import { getLang } from '../i18n/index.js'
 
 // ── 配置 ─────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,8 @@ async function handleGenerateReply(payload, tabId) {
 
   try {
     // 1. 创建 workflow run（直接用 fetch，不用 client）
-    const body = JSON.stringify({ reviews_content: review, hotel_context, invite_code })
+    const language = await getLang()
+    const body = JSON.stringify({ reviews_content: review, hotel_context, invite_code, language })
     console.log('[ServiceWorker] POST /review/run request body:', body)
     const response = await fetch(`${apiUrl}/review/run`, {
       method: 'POST',

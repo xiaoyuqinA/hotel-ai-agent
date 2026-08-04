@@ -28,3 +28,5 @@ class ReviewReplyState(TypedDict):
     hotel_id: str | None
     # 酒店上下文，由 load_hotel_context_node 加载
     hotel_context: HotelContext | None
+    # 回复语言（zh / en），默认 zh
+    language: str | None

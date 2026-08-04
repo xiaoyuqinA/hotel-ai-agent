@@ -41,6 +41,21 @@ function copyStaticAssets() {
       const stylesSrc = resolve(ROOT, "src", "content-script", "styles.css");
       const stylesDst = resolve(DIST, "styles.css");
       if (existsSync(stylesSrc)) copyFileSync(stylesSrc, stylesDst);
+
+      // 复制 _locales（扩展商店多语言名称/描述）
+      const localesSrc = resolve(PUBLIC, "_locales");
+      const localesDst = resolve(DIST, "_locales");
+      if (existsSync(localesSrc)) {
+        if (!existsSync(localesDst)) mkdirSync(localesDst, { recursive: true });
+        for (const dir of readdirSync(localesSrc)) {
+          const langSrc = resolve(localesSrc, dir);
+          const langDst = resolve(localesDst, dir);
+          if (!existsSync(langDst)) mkdirSync(langDst, { recursive: true });
+          for (const file of readdirSync(langSrc)) {
+            copyFileSync(resolve(langSrc, file), resolve(langDst, file));
+          }
+        }
+      }
     },
   };
 }
