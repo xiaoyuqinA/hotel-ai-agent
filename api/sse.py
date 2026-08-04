@@ -358,10 +358,19 @@ async def request_invite(request: Request) -> dict:
 
     if not phone or not name:
         return {"code": "failed", "message": "请填写手机号和姓名", "data": None}
-    if not (7 <= len(phone) <= 15):
-        return {"code": "failed", "message": "手机号格式不正确", "data": None}
 
-    from shared.invite.service import save_invite_request
+    from shared.invite.service import is_valid_cn_phone, check_request_rate_limit, save_invite_request
+
+    # 严格校验中国大陆手机号格式
+    if not is_valid_cn_phone(phone):
+        return {"code": "failed", "message": "手机号格式不正确，请输入有效的 11 位大陆手机号", "data": None}
+
+    # 频率限制（手机号 + IP）
+    client_ip = request.client.host if request.client else None
+    allowed, rate_msg = await check_request_rate_limit(phone, client_ip)
+    if not allowed:
+        return {"code": "failed", "message": rate_msg, "data": None}
+
     result = await save_invite_request(phone, name)
     if result == "duplicate":
         return {"code": "failed", "message": "该手机号已提交过申请，请勿重复填写", "error_code": "duplicate", "data": None}

@@ -73,6 +73,52 @@ async def save_invite_request(phone: str, name: str) -> str:
         return "error"
 
 
+def is_valid_cn_phone(phone: str) -> bool:
+    """严格校验中国大陆手机号格式。
+
+    规则：1 开头，第二位 3-9，共 11 位数字。
+    """
+    if not phone:
+        return False
+    import re
+    return bool(re.fullmatch(r"1[3-9]\d{9}", phone))
+
+
+async def check_request_rate_limit(phone: str, ip: str | None) -> tuple[bool, str]:
+    """邀请码申请频率限制（Redis 计数 + TTL）。
+
+    策略：
+    - 同一手机号：60 秒内最多提交 1 次
+    - 同一 IP：60 秒内最多提交 5 次
+
+    Returns:
+        (allowed: bool, message: str)
+    """
+    try:
+        from shared.workflow_events.event_store import _get_redis
+        r = await _get_redis()
+        phone_key = f"invite_req:phone:{phone}"
+        # 手机号限流：1 次 / 60s
+        phone_cnt = await r.incr(phone_key)
+        if phone_cnt == 1:
+            await r.expire(phone_key, 60)
+        if phone_cnt > 1:
+            return False, "提交过于频繁，请 1 分钟后再试"
+
+        if ip:
+            ip_key = f"invite_req:ip:{ip}"
+            ip_cnt = await r.incr(ip_key)
+            if ip_cnt == 1:
+                await r.expire(ip_key, 60)
+            if ip_cnt > 5:
+                return False, "操作过于频繁，请稍后再试"
+        return True, ""
+    except Exception as e:
+        logger.error("Rate limit check failed: %s", e)
+        # Redis 不可用时放行，避免阻断正常申请
+        return True, ""
+
+
 async def validate_invite_code(code: str) -> tuple[bool, str]:
     """验证邀请码有效性。
 
