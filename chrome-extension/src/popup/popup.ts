@@ -57,7 +57,8 @@ async function render() {
   // 2. 有邀请码 → 走原有酒店逻辑
   const current = await configService.getCurrentHotel();
   if (!current) {
-    return renderCreateHotel();
+    // 从邀请码配置进来，显示"跳过"按钮（点击关闭 popup）
+    return renderCreateHotel(undefined, true);
   }
 
   return renderHotelHome(current);
@@ -126,7 +127,7 @@ async function onVerifyInvite() {
 
 // ── 视图 1：创建酒店 ─────────────────────────────────────────────────────────
 
-function renderCreateHotel(errorMsg?: string) {
+function renderCreateHotel(errorMsg?: string, showSkip = false) {
   contentEl.innerHTML = `
     <div class="section">
       <div class="label">${t('create.welcome')}</div>
@@ -140,8 +141,8 @@ function renderCreateHotel(errorMsg?: string) {
              placeholder="${t('create.city_placeholder')}"
              style="margin-bottom:12px;" />
       <button class="btn btn-primary" id="create-hotel-btn">${t('create.submit')}</button>
-      <button class="btn btn-secondary" id="skip-hotel-btn"
-              style="margin-top:8px;">${t('create.skip')}</button>
+      ${showSkip ? `<button class="btn btn-secondary" id="skip-hotel-btn"
+              style="margin-top:8px;">${t('create.skip')}</button>` : ''}
       <div id="create-status" class="status-text ${errorMsg ? 'error' : ''}">
         ${errorMsg || ''}
       </div>
@@ -149,7 +150,9 @@ function renderCreateHotel(errorMsg?: string) {
   `;
 
   document.getElementById('create-hotel-btn')!.addEventListener('click', onCreateHotel);
-  document.getElementById('skip-hotel-btn')!.addEventListener('click', () => window.close());
+  if (showSkip) {
+    document.getElementById('skip-hotel-btn')!.addEventListener('click', () => window.close());
+  }
 }
 
 async function onCreateHotel() {
