@@ -418,22 +418,27 @@ async function onGenerate() {
   // hotel_context 由 Service Worker 自己从 storage 读取
   // Content Script 只传 review
 
-  const adapter = await getAdapter();
-  if (!adapter) {
-    updateStatus('error', t('widget.page_not_supported'));
-    setPanelView('idle');
-    return;
-  }
+  // 优先使用已保存的评论（重试时保留用户选中的文字），
+  // 为空时才重新从页面提取。
+  let review = _currentReview || '';
 
-  const ctx = await adapter.getReview();
-  const review = ctx?.content ?? '';
   if (!review) {
-    updateStatus('error', t('widget.no_review'));
-    setPanelView('idle');
-    return;
-  }
+    const adapter = await getAdapter();
+    if (!adapter) {
+      updateStatus('error', t('widget.page_not_supported'));
+      setPanelView('idle');
+      return;
+    }
 
-  _currentReview = review;
+    const ctx = await adapter.getReview();
+    review = ctx?.content ?? '';
+    if (!review) {
+      updateStatus('error', t('widget.no_review'));
+      setPanelView('idle');
+      return;
+    }
+    _currentReview = review;
+  }
 
   // 检查邀请码
   try {
