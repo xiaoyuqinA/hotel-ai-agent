@@ -339,6 +339,8 @@ function renderCompleted() {
       </div>
       ${review ? `<div class="ha-review-box"><strong>${t('widget.review_label')}</strong>${review}</div>` : ''}
       <div class="ha-reply-box" id="ha-reply-box">${reply || t('widget.empty_reply')}</div>
+    </div>
+    <div class="ha-panel-footer">
       <div class="ha-actions">
         <button class="ha-btn ha-btn-secondary" id="ha-edit-btn">${t('widget.edit_reply')}</button>
         <button class="ha-btn ha-btn-primary" id="ha-copy-btn">${t('widget.copy')}</button>
@@ -380,6 +382,8 @@ function renderEditing() {
         <span class="ha-status-text">${t('widget.editing_reply')}</span>
       </div>
       <textarea class="ha-edit-textarea" id="ha-edit-textarea" rows="6">${reply}</textarea>
+    </div>
+    <div class="ha-panel-footer">
       <div class="ha-actions">
         <button class="ha-btn ha-btn-secondary" id="ha-edit-cancel-btn">${t('widget.edit_cancel')}</button>
         <button class="ha-btn ha-btn-primary" id="ha-edit-confirm-btn">${t('widget.edit_confirm')}</button>
@@ -560,8 +564,14 @@ function getStyles() {
       font-size: 16px; display: flex; align-items: center; justify-content: center;
     }
     .ha-btn-icon:hover { background: rgba(255,255,255,0.3); }
-    .ha-panel-body { padding: 14px 16px 16px; overflow-y: auto; flex: 1; min-height: 180px; }
+    .ha-panel-body { padding: 14px 16px 0; overflow-y: auto; flex: 1; min-height: 120px; }
     .ha-hotel-badge { font-size: 13px; font-weight: 500; color: #555; margin-bottom: 10px; }
+
+    /* 底部操作区固定可见，不随内容滚动 */
+    .ha-panel-footer {
+      flex-shrink: 0; padding: 10px 16px 14px;
+      border-top: 1px solid #f0f0f0; background: #fff;
+    }
 
     .ha-review-box {
       min-height: 60px; max-height: 100px; overflow-y: auto;
