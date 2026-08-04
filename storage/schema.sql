@@ -65,3 +65,16 @@ CREATE INDEX idx_invite_codes_active ON invite_codes(is_active);
 
 COMMENT ON TABLE invite_codes IS '商家邀请码，有效期 7 天';
 COMMENT ON COLUMN invite_codes.expires_at IS '过期时间，到期后自动失效';
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- invite_requests 表：邀请码申请记录（官网表单提交）
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS invite_requests (
+    id SERIAL PRIMARY KEY,
+    phone VARCHAR(32) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+COMMENT ON TABLE invite_requests IS '官网邀请码申请记录，供客服手动发放邀请码';

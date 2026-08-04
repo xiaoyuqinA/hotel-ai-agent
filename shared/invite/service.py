@@ -27,6 +27,41 @@ async def get_connection():
     return await asyncpg.connect(POSTGRES_DSN)
 
 
+async def save_invite_request(phone: str, name: str) -> bool:
+    """保存邀请码申请记录（手机号 + 姓名）。
+
+    建表（若不存在）并插入一条申请记录，供客服后续手动发放邀请码。
+    Returns:
+        bool: 是否成功
+    """
+    if not phone or not name:
+        return False
+    try:
+        conn = await get_connection()
+        try:
+            await conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS invite_requests (
+                    id SERIAL PRIMARY KEY,
+                    phone VARCHAR(32) NOT NULL,
+                    name VARCHAR(128) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+                """
+            )
+            await conn.execute(
+                "INSERT INTO invite_requests (phone, name) VALUES ($1, $2)",
+                phone,
+                name,
+            )
+            return True
+        finally:
+            await conn.close()
+    except Exception as e:
+        logger.error("Save invite request failed: %s", e)
+        return False
+
+
 async def validate_invite_code(code: str) -> tuple[bool, str]:
     """验证邀请码有效性。
 

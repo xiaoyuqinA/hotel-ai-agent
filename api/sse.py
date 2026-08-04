@@ -343,3 +343,35 @@ router.add_api_route(
     summary="验证邀请码",
     description="验证邀请码是否有效、未过期、未停用",
 )
+
+
+async def request_invite(request: Request) -> dict:
+    """保存邀请码申请（手机号 + 姓名）。
+
+    POST /review/invite/request
+    {"phone": "13800138000", "name": "张三"}
+    -> {"code": "success", "message": ""}
+    """
+    body = await request.json()
+    phone = (body.get("phone") or "").strip()
+    name = (body.get("name") or "").strip()
+
+    if not phone or not name:
+        return {"code": "failed", "message": "请填写手机号和姓名", "data": None}
+    if not (7 <= len(phone) <= 15):
+        return {"code": "failed", "message": "手机号格式不正确", "data": None}
+
+    from shared.invite.service import save_invite_request
+    ok = await save_invite_request(phone, name)
+    if not ok:
+        return {"code": "failed", "message": "提交失败，请稍后重试", "data": None}
+    return {"code": "success", "message": "已收到您的申请，客服会尽快与您联系", "data": None}
+
+
+router.add_api_route(
+    "/invite/request",
+    request_invite,
+    methods=["POST"],
+    summary="提交邀请码申请",
+    description="保存用户手机号和姓名，供客服手动发放邀请码",
+)

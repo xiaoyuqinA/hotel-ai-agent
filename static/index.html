@@ -127,16 +127,36 @@
     </div>
 
     <h2 class="section-title" id="contact">获取邀请码</h2>
-    <p class="section-sub">扫码添加客服，开通使用资格</p>
+    <p class="section-sub">填写信息申请，客服将为您开通使用资格</p>
     <div class="download">
-      <div style="margin-bottom:20px;">请使用微信扫码添加客服，客服将为您开通使用资格并发放邀请码。</div>
-      <img src="/static/wechat-qr.png" alt="客服二维码" style="width:220px;height:220px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);">
+      <form id="invite-request-form" style="max-width:360px;margin:0 auto;text-align:left;">
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:14px;color:#555;margin-bottom:6px;">姓名</label>
+          <input type="text" id="req-name" placeholder="请输入您的姓名"
+                 style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;" required>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:14px;color:#555;margin-bottom:6px;">手机号</label>
+          <input type="tel" id="req-phone" placeholder="请输入您的手机号"
+                 style="width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px;box-sizing:border-box;" required>
+        </div>
+        <button type="submit" id="req-submit-btn"
+                style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;">
+          提交申请
+        </button>
+        <div id="req-result" style="margin-top:14px;font-size:14px;color:#666;min-height:20px;"></div>
+      </form>
+
+      <div style="margin-top:30px;padding-top:20px;border-top:1px solid #eee;">
+        <div style="margin-bottom:12px;font-size:14px;color:#555;">咨询或升级功能，请扫码联系客服</div>
+        <img src="/static/wechat-qr.png" alt="客服二维码" style="width:200px;height:200px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);">
+      </div>
     </div>
 
     <h2 class="section-title" id="faq">常见问题</h2>
     <div class="faq">
       <div class="faq-item"><h4>Q: 扩展在哪些浏览器上可用？</h4><p>Chrome 和 Edge 均可使用。目前 Edge 扩展商店正在审核中，可先下载压缩包手动安装；商店上线后可获得自动更新。</p></div>
-      <div class="faq-item"><h4>Q: 需要邀请码吗？怎么获取？</h4><p>需要。邀请码由商家运营方发放，用于验证使用资格。请扫码添加企业微信客服，客服会为您开通使用资格。</p></div>
+      <div class="faq-item"><h4>Q: 需要邀请码吗？怎么获取？</h4><p>需要。邀请码由商家运营方发放，用于验证使用资格。请在上方填写姓名和手机号提交申请，客服会尽快与您联系并发放邀请码。</p></div>
       <div class="faq-item"><h4>Q: 扩展会收集我的数据吗？</h4><p>不会。扩展不收集浏览历史，不追踪用户。评论内容仅在您主动点击"生成回复"时发送到服务器用于生成 AI 回复，其余配置仅存本地。</p></div>
       <div class="faq-item"><h4>Q: 生成回复慢怎么办？</h4><p>回复生成依赖后端 AI 服务，通常需 3-10 秒。若长时间无响应，请刷新页面重试。</p></div>
       <div class="faq-item"><h4>Q: 浮标没有出现在页面上？</h4><p>请确认当前是 OTA 酒店评论页面（携程、飞猪等）。扩展浮标只在支持的 OTA 页面显示。</p></div>
@@ -150,5 +170,61 @@
       <a href="#contact">联系我们</a>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      var form = document.getElementById('invite-request-form');
+      if (!form) return;
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var nameEl = document.getElementById('req-name');
+        var phoneEl = document.getElementById('req-phone');
+        var resultEl = document.getElementById('req-result');
+        var btn = document.getElementById('req-submit-btn');
+        var name = (nameEl.value || '').trim();
+        var phone = (phoneEl.value || '').trim();
+
+        if (!name || !phone) {
+          resultEl.textContent = '请填写姓名和手机号';
+          resultEl.style.color = '#e0563f';
+          return;
+        }
+        if (!/^[0-9+\-\s]{7,15}$/.test(phone)) {
+          resultEl.textContent = '手机号格式不正确';
+          resultEl.style.color = '#e0563f';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '提交中...';
+        resultEl.textContent = '';
+
+        try {
+          var resp = await fetch('/review/invite/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, phone: phone }),
+          });
+          var data = await resp.json();
+          if (data.code === 'success') {
+            resultEl.textContent = '✅ 已收到您的申请，客服会尽快与您联系并发放邀请码';
+            resultEl.style.color = '#2fa84f';
+            nameEl.value = '';
+            phoneEl.value = '';
+          } else {
+            resultEl.textContent = data.message || '提交失败，请稍后重试';
+            resultEl.style.color = '#e0563f';
+          }
+        } catch (err) {
+          resultEl.textContent = '提交失败，请稍后重试';
+          resultEl.style.color = '#e0563f';
+        }
+
+        btn.disabled = false;
+        btn.textContent = '提交申请';
+      });
+    })();
+  </script>
 </body>
 </html>
