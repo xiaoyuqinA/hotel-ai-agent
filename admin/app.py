@@ -52,12 +52,26 @@ async def index(request: Request):
         )
     finally:
         await conn.close()
-    return templates.TemplateResponse("index.html", {"request": request, "codes": rows, "now": datetime.now(timezone.utc)})
+    return templates.TemplateResponse(request, "index.html", {"codes": rows, "now": datetime.now(timezone.utc)})
 
 
 @app.get("/generate", response_class=HTMLResponse)
 async def generate_page(request: Request):
-    return templates.TemplateResponse("generate.html", {"request": request})
+    return templates.TemplateResponse(request, "generate.html", {})
+
+
+@app.get("/requests", response_class=HTMLResponse)
+async def requests_page(request: Request):
+    """查看官网邀请码申请记录。"""
+    conn = await get_db()
+    try:
+        rows = await conn.fetch(
+            "SELECT id, name, phone, created_at "
+            "FROM invite_requests ORDER BY id DESC"
+        )
+    finally:
+        await conn.close()
+    return templates.TemplateResponse(request, "requests.html", {"requests": rows})
 
 
 @app.post("/generate")

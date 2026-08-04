@@ -33,6 +33,12 @@ class TestAdminPages:
         assert 'name="user_name"' in resp.text
         assert 'name="days"' in resp.text
 
+    def test_requests_page_returns_200(self, client):
+        """申请记录页面应返回 200。"""
+        resp = client.get("/requests")
+        assert resp.status_code == 200
+        assert "申请记录" in resp.text
+
 
 class TestInviteCodeActions:
     """邀请码操作功能测试。"""
