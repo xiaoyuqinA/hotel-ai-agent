@@ -103,4 +103,19 @@ export default {
   'widget.conn_error': 'Extension connection error, please refresh the page and retry',
   'widget.copied': '✅ Copied to clipboard',
   'widget.processing': 'Processing',
+
+  // ── 后端状态文案（display_name 本地化）──
+  'status.workflow_started': 'Workflow started',
+  'status.workflow_completed': 'Workflow completed',
+  'status.workflow_failed': 'Workflow failed',
+  'status.workflow_cancelled': 'Workflow cancelled',
+  'status.analysis_started': 'Analysis started',
+  'status.analysis_completed': 'Analysis completed',
+  'status.analysis_failed': 'Analysis failed',
+  'status.generation_started': 'Generating reply',
+  'status.generation_completed': 'Reply generated',
+  'status.generation_failed': 'Generation failed',
+  'status.review_started': 'Review started',
+  'status.review_completed': 'Review completed',
+  'status.review_failed': 'Review failed',
 } as const;

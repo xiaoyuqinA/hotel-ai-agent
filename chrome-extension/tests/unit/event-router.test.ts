@@ -9,6 +9,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getEventRouter, UIMessageType } from '../../src/background/event-router'
+import { setCurrentLang } from '../../src/i18n/index'
 
 // Mock chrome API
 const mockSendMessage = vi.fn()
@@ -22,6 +23,8 @@ describe('EventRouter', () => {
   let router: ReturnType<typeof getEventRouter>
 
   beforeEach(() => {
+    // 固定当前语言为中文，保证状态文案本地化后仍是中文
+    setCurrentLang('zh')
     vi.clearAllMocks()
     router = getEventRouter()
   })

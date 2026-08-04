@@ -104,4 +104,19 @@ export default {
   'widget.conn_error': '扩展连接异常，请刷新页面后重试',
   'widget.copied': '✅ 已复制到剪贴板',
   'widget.processing': '处理中',
+
+  // ── 后端状态文案（display_name 本地化）──
+  'status.workflow_started': '工作流开始',
+  'status.workflow_completed': '工作流完成',
+  'status.workflow_failed': '工作流失败',
+  'status.workflow_cancelled': '工作流取消',
+  'status.analysis_started': '分析开始',
+  'status.analysis_completed': '分析完成',
+  'status.analysis_failed': '分析失败',
+  'status.generation_started': '生成开始',
+  'status.generation_completed': '生成完成',
+  'status.generation_failed': '生成失败',
+  'status.review_started': '审核开始',
+  'status.review_completed': '审核完成',
+  'status.review_failed': '审核失败',
 } as const;

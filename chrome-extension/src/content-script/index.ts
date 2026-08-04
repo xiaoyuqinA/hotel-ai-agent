@@ -59,13 +59,10 @@ async function _ensureRuntimeReady(maxRetries = 10, interval = 500): Promise<boo
   return false;
 }
 
-function init() {
-  // 初始化语言（storage → 浏览器检测）
-  initI18n().then((lang) => {
-    setCurrentLang(lang);
-    // 若面板已渲染，刷新文案
-    if (panel) renderCurrentView();
-  });
+async function init() {
+  // 初始化语言（storage → 浏览器检测），确保就绪后再注册消息监听，
+  // 避免 WORKFLOW_STARTED 等消息到达时 _currentLang 仍是默认 zh。
+  await initI18n();
 
   // 语言切换（popup 修改 storage 时同步）
   try {

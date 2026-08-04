@@ -60,7 +60,7 @@ function handleSystemEvent(event, tabId) {
       sendToContentScript(tabId, {
         type: UIMessageType.WORKFLOW_COMPLETED,
         payload: {
-          status: event.display_name || 'completed',
+          status: localizeStatus(event.display_name) || 'completed',
           result: event.result,
         },
       })
@@ -87,11 +87,37 @@ function handleSystemEvent(event, tabId) {
   }
 }
 
+/**
+ * 将后端中文 display_name 本地化为当前语言。
+ * 后端推送的中文状态文案（如"生成开始"）无法被前端 t() 识别，
+ * 这里按 display_name 内容做映射，未识别的回退原值。
+ */
+function localizeStatus(displayName) {
+  if (!displayName) return ''
+  const map = {
+    '工作流开始': t('status.workflow_started'),
+    '工作流完成': t('status.workflow_completed'),
+    '工作流失败': t('status.workflow_failed'),
+    '工作流取消': t('status.workflow_cancelled'),
+    '分析开始': t('status.analysis_started'),
+    '分析完成': t('status.analysis_completed'),
+    '分析失败': t('status.analysis_failed'),
+    '生成开始': t('status.generation_started'),
+    '回复生成完成': t('status.generation_completed'),
+    '生成完成': t('status.generation_completed'),
+    '生成失败': t('status.generation_failed'),
+    '审核开始': t('status.review_started'),
+    '审核完成': t('status.review_completed'),
+    '审核失败': t('status.review_failed'),
+  }
+  return map[displayName] ?? displayName
+}
+
 function sendStatusUpdate(tabId, status, message) {
   if (!message) return
   sendToContentScript(tabId, {
     type: UIMessageType.STATUS_UPDATE,
-    payload: { status, message },
+    payload: { status, message: localizeStatus(message) },
   })
 }
 
@@ -106,11 +132,11 @@ function handleProgressEvent(event, tabId) {
   switch (event.kind) {
     case 'node_started':
     case 'node_completed':
-      message = event.display_name
+      message = localizeStatus(event.display_name)
       break
 
     case 'node_failed':
-      message = event.display_name
+      message = localizeStatus(event.display_name)
       statusType = 'error'
       break
 
