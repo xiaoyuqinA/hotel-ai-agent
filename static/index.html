@@ -176,6 +176,19 @@
       var form = document.getElementById('invite-request-form');
       if (!form) return;
 
+      // 禁用整个表单（置灰不可填写）
+      function disableForm(form, message) {
+        var inputs = form.querySelectorAll('input');
+        var btn = document.getElementById('req-submit-btn');
+        inputs.forEach(function (el) { el.disabled = true; });
+        if (btn) { btn.disabled = true; btn.style.background = '#ccc'; btn.style.cursor = 'not-allowed'; }
+        if (message) {
+          var resultEl = document.getElementById('req-result');
+          resultEl.textContent = message;
+          resultEl.style.color = '#888';
+        }
+      }
+
       form.addEventListener('submit', async function (e) {
         e.preventDefault();
         var nameEl = document.getElementById('req-name');
@@ -208,21 +221,22 @@
           });
           var data = await resp.json();
           if (data.code === 'success') {
-            resultEl.textContent = '✅ 已收到您的申请，客服会尽快与您联系并发放邀请码';
-            resultEl.style.color = '#2fa84f';
-            nameEl.value = '';
-            phoneEl.value = '';
+            disableForm(form, '✅ 已收到您的申请，客服会尽快与您联系并发放邀请码');
+          } else if (data.error_code === 'duplicate') {
+            // 手机号已提交过，禁止重复填写
+            disableForm(form, '该手机号已提交过申请，请勿重复填写');
           } else {
             resultEl.textContent = data.message || '提交失败，请稍后重试';
             resultEl.style.color = '#e0563f';
+            btn.disabled = false;
+            btn.textContent = '提交申请';
           }
         } catch (err) {
           resultEl.textContent = '提交失败，请稍后重试';
           resultEl.style.color = '#e0563f';
+          btn.disabled = false;
+          btn.textContent = '提交申请';
         }
-
-        btn.disabled = false;
-        btn.textContent = '提交申请';
       });
     })();
   </script>

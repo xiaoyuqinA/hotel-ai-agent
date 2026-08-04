@@ -362,8 +362,10 @@ async def request_invite(request: Request) -> dict:
         return {"code": "failed", "message": "手机号格式不正确", "data": None}
 
     from shared.invite.service import save_invite_request
-    ok = await save_invite_request(phone, name)
-    if not ok:
+    result = await save_invite_request(phone, name)
+    if result == "duplicate":
+        return {"code": "failed", "message": "该手机号已提交过申请，请勿重复填写", "error_code": "duplicate", "data": None}
+    if result != "success":
         return {"code": "failed", "message": "提交失败，请稍后重试", "data": None}
     return {"code": "success", "message": "已收到您的申请，客服会尽快与您联系", "data": None}
 

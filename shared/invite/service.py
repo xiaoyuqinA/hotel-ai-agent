@@ -27,15 +27,19 @@ async def get_connection():
     return await asyncpg.connect(POSTGRES_DSN)
 
 
-async def save_invite_request(phone: str, name: str) -> bool:
+async def save_invite_request(phone: str, name: str) -> str:
     """保存邀请码申请记录（手机号 + 姓名）。
 
     建表（若不存在）并插入一条申请记录，供客服后续手动发放邀请码。
+    手机号已存在时返回 "duplicate" 表示不可重复申请。
+
     Returns:
-        bool: 是否成功
+        "success": 保存成功
+        "duplicate": 该手机号已提交过申请
+        "error": 保存失败
     """
     if not phone or not name:
-        return False
+        return "error"
     try:
         conn = await get_connection()
         try:
@@ -49,17 +53,24 @@ async def save_invite_request(phone: str, name: str) -> bool:
                 )
                 """
             )
+            # 手机号去重校验
+            existing = await conn.fetchrow(
+                "SELECT id FROM invite_requests WHERE phone = $1",
+                phone,
+            )
+            if existing:
+                return "duplicate"
             await conn.execute(
                 "INSERT INTO invite_requests (phone, name) VALUES ($1, $2)",
                 phone,
                 name,
             )
-            return True
+            return "success"
         finally:
             await conn.close()
     except Exception as e:
         logger.error("Save invite request failed: %s", e)
-        return False
+        return "error"
 
 
 async def validate_invite_code(code: str) -> tuple[bool, str]:
