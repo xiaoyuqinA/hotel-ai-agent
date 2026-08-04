@@ -85,7 +85,24 @@ async function init() {
     console.log('[AssistantWidget] runtime reconnected');
   });
 
+  // 页面动态插入元素（如 Booking 评论浮层）可能覆盖 FAB。
+  // 监听 body 子节点变化，保持 FAB 在 body 末尾，避免被 DOM 顺序靠后的元素遮挡。
+  try {
+    if (document.body) {
+      const observer = new MutationObserver(keepFABOnTop);
+      observer.observe(document.body, { childList: true, subtree: false });
+    }
+  } catch { /* MutationObserver 不可用时忽略 */ }
+
   console.log('[AssistantWidget] initialized');
+}
+
+/** 确保 FAB 保持在 body 末尾（避免被后插入的同层级高 z-index 元素遮挡） */
+function keepFABOnTop() {
+  const fabEl = document.getElementById('hotel-ai-fab');
+  if (fabEl && document.body && fabEl !== document.body.lastElementChild) {
+    document.body.appendChild(fabEl);
+  }
 }
 
 // ── 消息处理（来自 Service Worker） ──────────────────────────────────────────
@@ -151,16 +168,23 @@ let fab = null;
 function injectFAB() {
   if (document.getElementById('hotel-ai-fab')) return;
 
+  // body 可能尚未就绪（document_idle 但 Booking 重脚本），重试直至可用
+  if (!document.body) {
+    setTimeout(injectFAB, 200);
+    return;
+  }
+
   fab = document.createElement('div');
   fab.id = 'hotel-ai-fab';
   fab.className = 'hotel-ai-fab';
   fab.innerHTML = '<span>✦</span>';
   fab.title = t('widget.title');
 
+  // 用捕获阶段监听，避免页面全局监听器拦截点击
   fab.addEventListener('click', (e) => {
     e.stopPropagation();
     togglePanel();
-  });
+  }, true);
 
   document.body.appendChild(fab);
 }
