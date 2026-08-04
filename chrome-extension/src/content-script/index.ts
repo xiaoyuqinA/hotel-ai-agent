@@ -539,8 +539,8 @@ function getStyles() {
 
     #hotel-ai-panel {
       position: fixed; right: 24px; bottom: 88px;
-      width: 380px; max-width: calc(100vw - 48px);
-      max-height: calc(100vh - 120px);
+      width: 420px; max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 80px);
       background: white; border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.18);
       z-index: 2147483646;
@@ -574,7 +574,7 @@ function getStyles() {
     }
 
     .ha-review-box {
-      min-height: 60px; max-height: 100px; overflow-y: auto;
+      min-height: 60px; max-height: 120px; overflow-y: auto;
       padding: 10px 12px; background: #f9f9f9;
       border: 1px solid #eee; border-radius: 8px;
       font-size: 13px; line-height: 1.5; color: #333; margin-bottom: 10px;
@@ -582,7 +582,7 @@ function getStyles() {
     .ha-review-box .ha-placeholder { color: #bbb; font-style: italic; }
 
     .ha-reply-box {
-      min-height: 100px; max-height: 200px; overflow-y: auto;
+      min-height: 100px; max-height: 400px; overflow-y: auto;
       padding: 12px; background: #fafafa;
       border: 1px solid #eee; border-radius: 8px;
       font-size: 14px; line-height: 1.6; color: #333;
